@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Monte Carlo Retirement Planner</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,7 +21,9 @@ body {
 #topbar {
   background: #181c2a;
   border-bottom: 2px solid #2d3350;
-  padding: 10px 20px;
+  /* env() pushes content below the iOS Dynamic Island / notch when present;
+     the topbar background fills the inset so the bar still reads as one piece. */
+  padding: max(10px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 10px max(20px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
   justify-content: space-between;
