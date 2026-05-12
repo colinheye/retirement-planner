@@ -161,6 +161,19 @@ body {
 .about-body p { margin-bottom: 8px; }
 .about-body p:last-child { margin-bottom: 0; }
 .about-body strong { color: #cdd3e0; }
+.about-reset-btn {
+  background: transparent;
+  border: 1px solid #3a4060;
+  color: #aab5cc;
+  padding: 7px 16px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.about-reset-btn:hover { background: #2a3050; color: #cdd3e0; border-color: #5a7de8; }
 
 /* ---- EXPANDED SECTIONS ROW ---- */
 #expanded-row {
@@ -324,6 +337,7 @@ body {
   #accordion-grid details summary { font-size: 12px; padding: 10px 14px; }
   #about-section > summary { font-size: 12px; padding: 12px 16px; }
   .about-body { font-size: 14px; padding: 14px 18px 16px; }
+  .about-reset-btn { font-size: 13px; padding: 9px 18px; }
   .exp-mode-toggle label { font-size: 14px; padding: 9px 10px; }
   .exp-subhead { font-size: 12px; }
   .exp-total-row { font-size: 15px; }
@@ -387,6 +401,9 @@ body {
       <p>The <strong>Success Rate</strong> is the percentage of simulations where your liquid assets stayed above the <strong>Minimum Liquid Buffer</strong> all the way through end of life.</p>
       <p><strong>What to aim for:</strong> 80–90% is generally considered a comfortable target — high enough that failure is unlikely, but not so high that you're hoarding money you could be enjoying. Above 95% often means you're being overly conservative and could safely spend more. Below 70% leaves little room for surprises. Plans should be revisited as life unfolds, and spending kept flexible.</p>
       <p>Adjust the inputs below and tap <strong>Run Simulation</strong>. Your inputs save automatically in this browser.</p>
+      <p style="text-align:center;margin-top:14px;">
+        <button type="button" id="resetDefaultsBtn" class="about-reset-btn">Reset all inputs to defaults</button>
+      </p>
     </div>
   </details>
 
@@ -792,7 +809,9 @@ function _persistableEls() {
   return document.querySelectorAll('#content input[id], #content select[id]');
 }
 
+let _suppressSave = false;
 function saveInputs() {
+  if (_suppressSave) return;
   const state = {};
   _persistableEls().forEach(el => {
     if (el.type === 'checkbox' || el.type === 'radio') state[el.id] = el.checked;
@@ -817,6 +836,16 @@ document.getElementById('content').addEventListener('input', saveInputs);
 // iOS Safari can suspend a backgrounded tab without firing change/input —
 // pagehide is the documented hook for "tab is going away, persist now."
 window.addEventListener('pagehide', saveInputs);
+
+// Reset to defaults: wipe persisted state and reload. Suppress save first
+// so the pagehide handler during reload doesn't re-write the cleared key.
+document.getElementById('resetDefaultsBtn').addEventListener('click', function() {
+  if (!confirm('Reset all inputs to their default values? This cannot be undone.')) return;
+  _suppressSave = true;
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  location.reload();
+});
+
 restoreInputs();
 // restoreInputs may have written back uncomma'd values saved by an older
 // build — re-format so the display stays consistent.
