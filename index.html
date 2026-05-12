@@ -579,6 +579,57 @@ function updateCarePhasesVisibility() {
 document.getElementById('childBirthYears').addEventListener('input', updateCarePhasesVisibility);
 updateCarePhasesVisibility();
 
+// ---- Thousands-separator formatting for dollar / count inputs ----
+// HTML <input type="number"> refuses values containing commas, so these
+// inputs are converted to type=text inputmode=numeric. Caret position is
+// preserved by counting digits, so live formatting doesn't jump the cursor.
+const COMMA_FORMATTED_IDS = new Set([
+  'minBuffer', 'simCount',
+  'yourIncome', 'spouseIncome', 'cpIncome0', 'cpIncome6', 'cpIncome13',
+  'baseLiving', 'ltcCost', 'ltcPremium',
+  'brokerageBalance', 'brokerageBasis', 'hsa', 'ira', 'trad401k', 'roth401k',
+  'homeValue', 'originalMortgage', 'homeRepair', 'newHomeValue',
+  'vacPrice', 'vacMaintenance', 'vacRental',
+  'ssPrimary', 'ssSpouse',
+  'giftAmount', 'inhAmount',
+  'grLower', 'grUpper', 'rothMax',
+]);
+
+function formatWithCommas(str) {
+  const digits = String(str).replace(/[^\d]/g, '');
+  if (!digits) return '';
+  return parseInt(digits, 10).toLocaleString('en-US');
+}
+
+function applyCommas(el) {
+  const oldValue = el.value;
+  const oldCaret = el.selectionStart ?? oldValue.length;
+  const digitsBeforeCaret = (oldValue.slice(0, oldCaret).match(/\d/g) || []).length;
+  const newValue = formatWithCommas(oldValue);
+  if (newValue === oldValue) return;
+  el.value = newValue;
+  let pos = newValue.length;
+  let seen = 0;
+  for (let i = 0; i < newValue.length; i++) {
+    if (/\d/.test(newValue[i])) seen++;
+    if (seen >= digitsBeforeCaret) { pos = i + 1; break; }
+  }
+  if (digitsBeforeCaret === 0) pos = 0;
+  try { el.setSelectionRange(pos, pos); } catch (e) {}
+}
+
+COMMA_FORMATTED_IDS.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.type = 'text';
+  el.inputMode = 'numeric';
+  el.value = formatWithCommas(el.value);
+});
+
+document.getElementById('content').addEventListener('input', e => {
+  if (COMMA_FORMATTED_IDS.has(e.target.id)) applyCommas(e.target);
+});
+
 // ---- localStorage persistence for input defaults ----
 // Bumping the version suffix invalidates everyone's saved state — only do that
 // if a field's meaning (not just label) changes incompatibly.
@@ -1218,8 +1269,8 @@ function processResults(allRuns) {
 
 // ---- Read config from UI ----
 function readConfig() {
-  const v = id => parseFloat(document.getElementById(id).value) || 0;
-  const vi = id => parseInt(document.getElementById(id).value) || 0;
+  const v = id => parseFloat(String(document.getElementById(id).value).replace(/,/g, '')) || 0;
+  const vi = id => parseInt(String(document.getElementById(id).value).replace(/,/g, ''), 10) || 0;
   const vb = id => document.getElementById(id).checked;
   const vs = id => document.getElementById(id).value;
 
