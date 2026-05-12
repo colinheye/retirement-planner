@@ -1223,7 +1223,9 @@ function runOnce(cfg) {
       : 0;
     const ltcPremiums = ltcPremiumCount * cfg.ltcPremium * healthInfl;
 
-    const carCost = (yrsElapsed > 0 && yrsElapsed % cfg.carInterval === 0)
+    // Car purchases stop after age 80 — most people stop driving / replacing
+    // vehicles around then; preserved cars carry on without a new outlay.
+    const carCost = (yrsElapsed > 0 && yrsElapsed % cfg.carInterval === 0 && age <= 80)
                       ? cfg.carCost * infl : 0;
     const repairCost = !homeSold && homeVal > 0 ? cfg.homeRepair * infl : 0;
     const propTax    = homeVal > 0 ? cfg.propTaxRate * homeVal : 0;
@@ -1497,9 +1499,14 @@ function runOnce(cfg) {
       liq = 0;
     }
 
+    const homeEquity = Math.max(0, homeVal - homeMortgage);
+    const vacEquity  = vacActive
+      ? Math.max(0, vacHomeVal * (cfg.vacOwnership / 100) - vacMortgage)
+      : 0;
     history.push({
       year: yr, age,
       liquidAssets: Math.max(0, liq),
+      netWorth:   Math.max(0, liq) + homeEquity + vacEquity,
       brokerage:  Math.max(0, brokBal),
       hsa:        Math.max(0, hsa),
       ira:        Math.max(0, ira),
@@ -1697,8 +1704,10 @@ const CHART_CATEGORIES = [
   { label: 'Living',     color: '#4d8cff', keys: ['expLiving'] },
   { label: 'Home',       color: '#3eb05a', keys: ['expHome', 'expRepair', 'expVac'] },
   { label: 'Healthcare', color: '#f08f3c', keys: ['expHealth', 'expLtcPrem'] },
-  { label: 'Other',      color: '#9b7ad6', keys: ['expKids', 'expCar'] },
+  { label: 'Kids',       color: '#9b7ad6', keys: ['expKids'] },
+  { label: 'Car',        color: '#c4a25a', keys: ['expCar'] },
 ];
+const NET_WORTH_COLOR = '#5fc9d4';
 
 let _lastChartHistory = null;
 
@@ -1728,6 +1737,22 @@ function _niceXTicks(xMin, xMax) {
   return ticks;
 }
 
+// Smallest "nice" multiplier ≥ raw (1, 2, 2.5, 5, 10, 20, 25, ...). Used so
+// that when we set yMaxRight = factor × yMaxLeft, each left tick maps to a
+// clean right-axis label.
+function _niceFactor(raw) {
+  if (!isFinite(raw) || raw <= 0) return 1;
+  const candidates = [1, 2, 2.5, 5];
+  let mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (let pass = 0; pass < 4; pass++) {
+    for (const c of candidates) {
+      if (c * mag >= raw) return c * mag;
+    }
+    mag *= 10;
+  }
+  return raw;
+}
+
 function renderExpenseChart(history) {
   _lastChartHistory = history;
   const wrap = document.getElementById('chart-wrap');
@@ -1740,7 +1765,7 @@ function renderExpenseChart(history) {
   const H = isPhone ? Math.max(220, Math.round(W * 0.75))
                     : Math.max(240, Math.min(360, Math.round(W * 0.42)));
   const padL = isPhone ? 46 : 52;
-  const padR = 10;
+  const padR = isPhone ? 46 : 52;
   const padT = 8;
   const padB = isPhone ? 30 : 28;
   const innerW = W - padL - padR;
@@ -1754,15 +1779,24 @@ function renderExpenseChart(history) {
 
   if (!history || history.length === 0) { svg.innerHTML = ''; return; }
 
-  const data = history.map(h => {
-    const cats = CHART_CATEGORIES.map(c =>
-      c.keys.reduce((s, k) => s + (h[k] || 0), 0)
-    );
+  // Compute per-year category sums and filter out categories that are zero
+  // for the entire run (e.g. Kids when no birth years entered).
+  const allCatSums = history.map(h =>
+    CHART_CATEGORIES.map(c => c.keys.reduce((s, k) => s + (h[k] || 0), 0))
+  );
+  const activeCatIdx = CHART_CATEGORIES
+    .map((_, i) => i)
+    .filter(i => allCatSums.some(row => row[i] > 0));
+  const activeCats = activeCatIdx.map(i => CHART_CATEGORIES[i]);
+
+  const data = history.map((h, j) => {
+    const cats = activeCatIdx.map(i => allCatSums[j][i]);
     return {
       age: h.age,
       cats,
-      income: (h.wageIncome || 0) + (h.ssIncome || 0),
-      total:  cats.reduce((s, v) => s + v, 0),
+      income:   (h.wageIncome || 0) + (h.ssIncome || 0),
+      netWorth: h.netWorth || 0,
+      total:    cats.reduce((s, v) => s + v, 0),
     };
   });
 
@@ -1772,6 +1806,12 @@ function renderExpenseChart(history) {
   const yTicks = _niceYTicks(yMaxRaw, 5);
   const yMax = Math.max(yTicks[yTicks.length - 1], yMaxRaw);
 
+  // Secondary axis: net worth. Pick a "nice" scale factor so each left tick
+  // maps to a clean right-axis label (left tick × factor).
+  const nwMaxRaw = Math.max(0, ...data.map(d => d.netWorth)) * 1.05;
+  const factor = _niceFactor(nwMaxRaw / yMax);
+  const yMaxRight = yMax * factor;
+
   const ages = data.map(d => d.age);
   const xMin = ages[0];
   const xMax = ages[ages.length - 1];
@@ -1779,6 +1819,7 @@ function renderExpenseChart(history) {
 
   const x = age => padL + (age - xMin) / xRange * innerW;
   const y = val => padT + innerH - (val / yMax) * innerH;
+  const yR = val => padT + innerH - (val / yMaxRight) * innerH;
 
   const parts = [];
 
@@ -1786,6 +1827,7 @@ function renderExpenseChart(history) {
     const yp = y(t);
     parts.push(`<line x1="${padL}" y1="${yp}" x2="${W - padR}" y2="${yp}" stroke="#2d3350" stroke-width="1"/>`);
     parts.push(`<text x="${padL - 6}" y="${yp + fsAxis * 0.35}" text-anchor="end" font-size="${fsAxis}" fill="#7a85a0">${_fmtChartMoney(t)}</text>`);
+    parts.push(`<text x="${W - padR + 6}" y="${yp + fsAxis * 0.35}" text-anchor="start" font-size="${fsAxis}" fill="${NET_WORTH_COLOR}" opacity="0.85">${_fmtChartMoney(t * factor)}</text>`);
   });
 
   _niceXTicks(xMin, xMax).forEach(t => {
@@ -1793,7 +1835,7 @@ function renderExpenseChart(history) {
     parts.push(`<text x="${xp}" y="${H - padB + fsAxis + 2}" text-anchor="middle" font-size="${fsAxis}" fill="#7a85a0">${t}</text>`);
   });
 
-  for (let i = 0; i < CHART_CATEGORIES.length; i++) {
+  for (let i = 0; i < activeCats.length; i++) {
     let topPath = '';
     let botPath = '';
     for (let j = 0; j < data.length; j++) {
@@ -1802,14 +1844,22 @@ function renderExpenseChart(history) {
       topPath += (j === 0 ? 'M' : 'L') + x(data[j].age) + ' ' + y(cumCurr);
       botPath  = ' L' + x(data[j].age) + ' ' + y(cumPrev) + botPath;
     }
-    parts.push(`<path d="${topPath}${botPath} Z" fill="${CHART_CATEGORIES[i].color}" opacity="0.88"/>`);
+    parts.push(`<path d="${topPath}${botPath} Z" fill="${activeCats[i].color}" opacity="0.88"/>`);
   }
 
+  // Total income — dashed
   let incPath = '';
   for (let j = 0; j < data.length; j++) {
     incPath += (j === 0 ? 'M' : 'L') + x(data[j].age) + ' ' + y(data[j].income);
   }
   parts.push(`<path d="${incPath}" stroke="#e8ecf4" stroke-width="2" fill="none" stroke-dasharray="6,4"/>`);
+
+  // Net worth — solid line on the secondary axis
+  let nwPath = '';
+  for (let j = 0; j < data.length; j++) {
+    nwPath += (j === 0 ? 'M' : 'L') + x(data[j].age) + ' ' + yR(data[j].netWorth);
+  }
+  parts.push(`<path d="${nwPath}" stroke="${NET_WORTH_COLOR}" stroke-width="2" fill="none"/>`);
 
   parts.push(`<line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#3a4060" stroke-width="1"/>`);
   parts.push(`<text x="${padL + innerW / 2}" y="${H - 4}" text-anchor="middle" font-size="${fsTitle}" fill="#5a6480">Age</text>`);
@@ -1818,10 +1868,11 @@ function renderExpenseChart(history) {
 
   if (legend) {
     legend.innerHTML =
-      CHART_CATEGORIES.map(c =>
+      activeCats.map(c =>
         `<span class="legend-item"><span class="legend-swatch" style="background:${c.color}"></span>${c.label}</span>`
       ).join('') +
-      `<span class="legend-item"><span class="legend-line"></span>Total Income</span>`;
+      `<span class="legend-item"><span class="legend-line"></span>Income</span>` +
+      `<span class="legend-item"><span class="legend-line legend-line-solid" style="border-top-color:${NET_WORTH_COLOR};border-top-style:solid"></span>Net Worth</span>`;
   }
 }
 
