@@ -245,12 +245,25 @@ body {
   #accordion-grid details:nth-child(2n) { border-right: none; }
   #accordion-grid details { border-right: none; }
 
-  /* Larger touch targets + readable text. 16px on inputs prevents iOS
-     auto-zoom on focus. */
-  .field-row label { font-size: 13px; min-width: 140px; }
+  /* Uniform two-column grid: label fills remaining width, input is a
+     fixed narrower column so every row lines up identically. 16px on
+     inputs prevents iOS auto-zoom on focus. */
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 130px;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 7px;
+  }
+  .field-row label { font-size: 15px; min-width: 0; }
   .field-row input[type="text"],
   .field-row input[type="number"],
-  .field-row select { font-size: 16px; padding: 6px 9px; }
+  .field-row select {
+    font-size: 16px;
+    padding: 7px 9px;
+    width: 100%;
+  }
+  .field-row input[type="checkbox"] { width: 18px; height: 18px; justify-self: start; }
   .section-open-header { font-size: 12px; padding: 10px 14px; }
   #accordion-grid details summary { font-size: 12px; padding: 10px 14px; }
   #about-section > summary { font-size: 12px; padding: 12px 16px; }
@@ -313,6 +326,7 @@ body {
     <div class="about-body">
       <p>This calculator runs <strong>thousands of randomized simulations</strong> of your financial future. Each one rolls the dice on stock returns, inflation, healthcare costs, and how long you and your spouse live — then tracks your accounts, taxes, income, and spending year by year.</p>
       <p>The <strong>Success Rate</strong> is the percentage of simulations where your liquid assets stayed above the <strong>Minimum Liquid Buffer</strong> all the way through end of life.</p>
+      <p><strong>What to aim for:</strong> 80–90% is generally considered a comfortable target — high enough that failure is unlikely, but not so high that you're hoarding money you could be enjoying. Above 95% often means you're being overly conservative and could safely spend more. Below 70% leaves little room for surprises. Plans should be revisited as life unfolds, and spending kept flexible.</p>
       <p>Adjust the inputs below and tap <strong>Run Simulation</strong>. Your inputs save automatically in this browser.</p>
     </div>
   </details>
