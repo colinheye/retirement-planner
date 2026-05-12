@@ -1224,9 +1224,11 @@ function runOnce(cfg) {
       ? (age < pLtcStart && age < pLife ? 1 : 0) + (age < sLtcStart && age < sLife ? 1 : 0)
       : 0;
     const coverageFrac = cfg.ltcCovered ? cfg.ltcCoverage : 0;
-    const health = isRetired
-      ? (12000 * healthInfl + ltcCount * cfg.ltcCost * (1 - coverageFrac) * healthInfl)
-      : 0;
+    // Split into baseline healthcare (always present in retirement) vs the
+    // LTC event spike so the chart can show them as distinct bands.
+    const healthBase   = isRetired ? 12000 * healthInfl : 0;
+    const ltcEventCost = isRetired ? (ltcCount * cfg.ltcCost * (1 - coverageFrac) * healthInfl) : 0;
+    const health = healthBase + ltcEventCost;
     const ltcPremiums = ltcPremiumCount * cfg.ltcPremium * healthInfl;
 
     // Car purchases stop after age 80 — most people stop driving / replacing
@@ -1518,14 +1520,15 @@ function runOnce(cfg) {
       ira:        Math.max(0, ira),
       trad401k:   Math.max(0, trad401k),
       roth401k:   Math.max(0, roth401k),
-      expLiving:  living,
-      expHome:    mortPay + propTax,
-      expKids:    kidsCost,
-      expHealth:  health,
-      expCar:     carCost,
-      expRepair:  repairCost,
-      expLtcPrem: ltcPremiums,
-      expVac:     vacCost,
+      expLiving:    living,
+      expHome:      mortPay + propTax,
+      expKids:      kidsCost,
+      expHealthBase: healthBase,
+      expLtcEvent:  ltcEventCost,
+      expCar:       carCost,
+      expRepair:    repairCost,
+      expLtcPrem:   ltcPremiums,
+      expVac:       vacCost,
       ssIncome:   ss,
       wageIncome: wage,
     });
@@ -1710,7 +1713,8 @@ function readConfig() {
 const CHART_CATEGORIES = [
   { label: 'Living',     color: '#4d8cff', keys: ['expLiving'] },
   { label: 'Home',       color: '#3eb05a', keys: ['expHome', 'expRepair', 'expVac'] },
-  { label: 'Healthcare', color: '#f08f3c', keys: ['expHealth', 'expLtcPrem'] },
+  { label: 'Healthcare', color: '#f08f3c', keys: ['expHealthBase', 'expLtcPrem'] },
+  { label: 'LTC Event',  color: '#d04545', keys: ['expLtcEvent'] },
   { label: 'Kids',       color: '#9b7ad6', keys: ['expKids'] },
   { label: 'Car',        color: '#c4a25a', keys: ['expCar'] },
 ];
