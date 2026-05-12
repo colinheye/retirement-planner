@@ -500,6 +500,7 @@ body {
         <div id="moveDetails">
           <div class="field-row"><label>Sell/Move Year (elapsed)</label><input type="number" id="houseSellYear" value="8"></div>
           <div class="field-row"><label>New Home Value ($)</label><input type="number" id="newHomeValue" value="550000"></div>
+          <div class="field-row"><label>Down Payment (%)</label><input type="number" id="newDownPayment" value="20" step="1" min="0" max="100"></div>
           <div class="field-row"><label>New Mortgage Rate (%)</label><input type="number" id="newMortgageRate" value="6.50" step="0.1"></div>
         </div>
       </div>
@@ -607,6 +608,7 @@ body {
         <div class="field-row"><label>Bond Mean (%)</label><input type="number" id="bondMean" value="4" step="0.1"></div>
         <div class="field-row"><label>Bond Std (%)</label><input type="number" id="bondStd" value="5" step="0.1"></div>
         <div class="field-row"><label>Healthcare Inflation (%)</label><input type="number" id="healthInflation" value="5" step="0.1"></div>
+        <div class="field-row"><label>Investment Fee Drag (%)</label><input type="number" id="investmentFee" value="0.15" step="0.05"></div>
         <div class="field-row checkbox-row">
           <label for="glidePath">Glide Path (bonds near retirement)</label>
           <input type="checkbox" id="glidePath" checked>
@@ -647,6 +649,15 @@ body {
           </select>
         </div>
         <div class="field-row"><label>Annual Max ($)</label><input type="number" id="rothMax" value="100000"></div>
+      </div>
+    </div>
+
+    <!-- Tax Deductions -->
+    <div class="section-open">
+      <div class="section-open-header">Tax Deductions</div>
+      <div class="section-body">
+        <div class="field-row"><label>Annual Itemized ($)</label><input type="number" id="otherItemized" value="10000"></div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Other than mortgage interest. The model itemizes only when mortgage interest + this value exceeds the standard deduction; otherwise the standard deduction is used.</div>
       </div>
     </div>
 
@@ -746,6 +757,7 @@ const COMMA_FORMATTED_IDS = new Set([
   'ssPrimary', 'ssSpouse',
   'giftAmount', 'inhAmount',
   'grLower', 'grUpper', 'rothMax',
+  'otherItemized',
 ]);
 
 function formatWithCommas(str) {
@@ -880,6 +892,13 @@ class TaxEngine {
     ];
     this.stdDeduction = 29200;
     this.ltcg0Limit = 94000;
+    // Per-year itemized total (mortgage interest + other itemized). The
+    // simulation sets this before each calcTax call; itemizing only kicks in
+    // when this value beats the standard deduction.
+    this.itemizedDed = 0;
+  }
+  deduction() {
+    return Math.max(this.stdDeduction, this.itemizedDed);
   }
   adjustBrackets(rate) {
     this.brackets = this.brackets.map(([r, l]) => [r, l === Infinity ? Infinity : l * (1 + rate)]);
@@ -887,7 +906,7 @@ class TaxEngine {
     this.ltcg0Limit *= (1 + rate);
   }
   calcTax(ordinaryIncome, ltcgIncome) {
-    const taxableOrdinary = Math.max(0, ordinaryIncome - this.stdDeduction);
+    const taxableOrdinary = Math.max(0, ordinaryIncome - this.deduction());
     let fedOrdinary = 0, prev = 0;
     for (const [r, limit] of this.brackets) {
       if (taxableOrdinary > prev) {
@@ -1017,7 +1036,7 @@ function runOnce(cfg) {
       const sellCosts = homeVal * 0.06;
       const netProceeds = homeVal - homeMortgage - sellCosts;
       const newP = cfg.newHomeValue * infl;
-      const down = newP * 0.20;
+      const down = newP * cfg.newDownPayment / 100;
       const buyCosts = newP * 0.025;
       const req = down + buyCosts - netProceeds;
       if (req > 0) {
@@ -1148,12 +1167,13 @@ function runOnce(cfg) {
     const propTax    = homeVal > 0 ? cfg.propTaxRate * homeVal : 0;
 
     let mortPay = 0;
+    let mortgageInterest = 0;
     if (homeMortgage > 0) {
       const annPmt = mortgagePmt * 12;
-      const interest = homeMortgage * mortgageRate;
-      const princ = annPmt - interest;
+      mortgageInterest = homeMortgage * mortgageRate;
+      const princ = annPmt - mortgageInterest;
       if (homeMortgage < princ) {
-        mortPay = homeMortgage + interest;
+        mortPay = homeMortgage + mortgageInterest;
         homeMortgage = 0;
       } else {
         mortPay = annPmt;
@@ -1162,13 +1182,14 @@ function runOnce(cfg) {
     }
 
     let vacCost = 0;
+    let vacMortInterest = 0;
     if (vacActive) {
       let vacMortPay = 0;
       if (vacMortgage > 0) {
         const annPmt = vacMortgagePmt * 12;
-        const interest = vacMortgage * cfg.vacMortgageRate;
-        const princ = annPmt - interest;
-        if (vacMortgage < princ) { vacMortPay = vacMortgage + interest; vacMortgage = 0; }
+        vacMortInterest = vacMortgage * cfg.vacMortgageRate;
+        const princ = annPmt - vacMortInterest;
+        if (vacMortgage < princ) { vacMortPay = vacMortgage + vacMortInterest; vacMortgage = 0; }
         else { vacMortPay = annPmt; vacMortgage -= princ; }
       }
       const own = cfg.vacOwnership / 100;
@@ -1176,11 +1197,15 @@ function runOnce(cfg) {
     }
     const totalExp = living + kidsCost + health + ltcPremiums + mortPay + propTax + carCost + repairCost + vacCost;
 
+    // Set the year's itemized total; calcTax internally uses
+    // max(stdDeduction, itemizedDed) so itemizing only kicks in when it wins.
+    taxEngine.itemizedDed = mortgageInterest + vacMortInterest + cfg.otherItemized * infl;
+
     // --- MARKET RETURNS ---
     const sp = stockPct(age, cfg.glidePath);
     const mkt = sp * normalSample(cfg.stockMean, cfg.stockStd)
               + (1 - sp) * normalSample(cfg.bondMean, cfg.bondStd)
-              - 0.0015;
+              - cfg.investmentFee / 100;
     hsa      *= (1 + mkt);
     ira      *= (1 + mkt);
     trad401k *= (1 + mkt);
@@ -1298,7 +1323,7 @@ function runOnce(cfg) {
           for (const [r, l] of taxEngine.brackets) {
             if (r > cfg.rothBracket) { targetLimit = l; break; }
           }
-          const taxableRmd = Math.max(0, rmd - taxEngine.stdDeduction);
+          const taxableRmd = Math.max(0, rmd - taxEngine.deduction());
           const bracketSpace = Math.max(0, targetLimit - taxableRmd);
           rothConv = Math.min(tradBal, bracketSpace, cfg.rothMax * infl);
           if (rothConv > 0) {
@@ -1544,6 +1569,7 @@ function readConfig() {
     moveToNewHome:   vb('moveToNewHome'),
     houseSellYear:   vi('houseSellYear'),
     newHomeValue:    v('newHomeValue'),
+    newDownPayment:  v('newDownPayment'),
     newMortgageRate: v('newMortgageRate') / 100,
 
     vacActive:        vb('vacActive'),
@@ -1571,6 +1597,8 @@ function readConfig() {
     stockStd:  v('stockStd') / 100,
     bondMean:  v('bondMean') / 100,
     bondStd:   v('bondStd') / 100,
+    investmentFee: v('investmentFee'),
+    otherItemized: v('otherItemized'),
 
     glidePath:        vb('glidePath'),
     grLower:    v('grLower'),
