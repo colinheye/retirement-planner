@@ -438,7 +438,14 @@ body {
       <div class="section-body">
         <div class="field-row"><label>Birth Years (comma-sep)</label><input type="text" id="childBirthYears" value="" placeholder="e.g. 2027,2029"></div>
         <div id="carePhasesSection">
-          <div style="font-size:11px;color:#7a85a0;margin:6px 0 4px;">Spouse income by child age (added to your income)</div>
+          <div class="exp-subhead">Annual cost per child</div>
+          <div class="field-row"><label>Baseline 0–18 ($)</label><input type="number" id="kidBaseCost" value="12000"></div>
+          <div class="field-row"><label>Daycare 0–5 ($)</label><input type="number" id="kidDaycareCost" value="30000"></div>
+          <div class="field-row"><label>School 6–17 ($)</label><input type="number" id="kidSchoolCost" value="8000"></div>
+          <div class="field-row"><label>College 18–21 ($)</label><input type="number" id="kidCollegeCost" value="35000"></div>
+          <div style="font-size:11px;color:#7a85a0;margin:6px 0 4px;">Daycare cost is skipped when spouse income is reduced (stay-at-home phase below).</div>
+
+          <div class="exp-subhead">Spouse income by child age</div>
           <div class="field-row"><label>Ages 0–5 spouse income ($)</label><input type="number" id="cpIncome0" value="0" step="10000"></div>
           <div class="field-row"><label>Ages 6–12 spouse income ($)</label><input type="number" id="cpIncome6" value="0" step="10000"></div>
           <div class="field-row"><label>Ages 13+ spouse income ($)</label><input type="number" id="cpIncome13" value="180000" step="10000"></div>
@@ -478,6 +485,16 @@ body {
             <span class="label">Annual total</span>
             <span class="value" id="expCategoryTotal">—</span>
           </div>
+        </div>
+
+        <div class="exp-subhead">Car (applies in either mode)</div>
+        <div class="field-row checkbox-row">
+          <label for="carActive">Active</label>
+          <input type="checkbox" id="carActive" checked>
+        </div>
+        <div id="carDetailsRow">
+          <div class="field-row"><label>Cost per Purchase ($)</label><input type="number" id="carCost" value="30000"></div>
+          <div class="field-row"><label>Interval (yrs)</label><input type="number" id="carInterval" value="8"></div>
         </div>
       </div>
     </div>
@@ -678,6 +695,9 @@ document.getElementById('vacActive').addEventListener('change', function() {
 document.getElementById('moveToNewHome').addEventListener('change', function() {
   document.getElementById('moveDetails').style.display = this.checked ? 'block' : 'none';
 });
+document.getElementById('carActive').addEventListener('change', function() {
+  document.getElementById('carDetailsRow').style.display = this.checked ? 'block' : 'none';
+});
 
 // ---- Expense input mode toggle (annual total / by category) ----
 const EXP_MONTHLY_IDS = ['expGroceries', 'expDining', 'expUtilities', 'expTransport',
@@ -716,10 +736,13 @@ document.getElementById('expModeCategory').addEventListener('change', updateExpe
   document.getElementById(id).addEventListener('input', updateCategoryTotalLabel);
 });
 
-// ---- Care phases: show when children are entered ----
+// ---- Care phases / kid costs: show when at least one valid birth year is entered ----
 function updateCarePhasesVisibility() {
-  const hasChildren = document.getElementById('childBirthYears').value.trim().length > 0;
-  document.getElementById('carePhasesSection').style.display = hasChildren ? 'block' : 'none';
+  const text = document.getElementById('childBirthYears').value;
+  const validYears = text.split(',')
+    .map(s => parseInt(s.trim(), 10))
+    .filter(n => !isNaN(n) && n >= 1900 && n <= 2100);
+  document.getElementById('carePhasesSection').style.display = validYears.length ? 'block' : 'none';
 }
 document.getElementById('childBirthYears').addEventListener('input', updateCarePhasesVisibility);
 updateCarePhasesVisibility();
@@ -735,6 +758,7 @@ const COMMA_FORMATTED_IDS = new Set([
   'expGroceries', 'expDining', 'expUtilities', 'expTransport',
   'expSubscriptions', 'expPersonal', 'expOtherMonthly',
   'expTravel', 'expGiftsCharity', 'expOtherAnnual',
+  'carCost', 'kidBaseCost', 'kidDaycareCost', 'kidSchoolCost', 'kidCollegeCost',
   'brokerageBalance', 'brokerageBasis', 'hsa', 'ira', 'trad401k', 'roth401k',
   'homeValue', 'originalMortgage', 'homeRepair', 'newHomeValue',
   'vacPrice', 'vacMaintenance', 'vacRental',
@@ -825,6 +849,7 @@ COMMA_FORMATTED_IDS.forEach(id => {
 document.getElementById('spouseWorks').dispatchEvent(new Event('change'));
 document.getElementById('vacActive').dispatchEvent(new Event('change'));
 document.getElementById('moveToNewHome').dispatchEvent(new Event('change'));
+document.getElementById('carActive').dispatchEvent(new Event('change'));
 updateExpenseModeUI();
 updateCarePhasesVisibility();
 
@@ -1108,10 +1133,10 @@ function runOnce(cfg) {
     let kidsCost = 0;
     for (const bYr of childYears) {
       const kAge = yr - bYr;
-      if (kAge >= 0 && kAge <= 18) kidsCost += 12000 * infl;
-      if (kAge >= 0 && kAge <= 5 && !incomeReduc) kidsCost += 30000 * infl;
-      else if (kAge >= 6 && kAge <= 17) kidsCost += 8000 * infl;
-      else if (kAge >= 18 && kAge <= 21) kidsCost += 35000 * eduPriceLevel;
+      if (kAge >= 0 && kAge <= 18) kidsCost += cfg.kidBaseCost * infl;
+      if (kAge >= 0 && kAge <= 5 && !incomeReduc) kidsCost += cfg.kidDaycareCost * infl;
+      else if (kAge >= 6 && kAge <= 17) kidsCost += cfg.kidSchoolCost * infl;
+      else if (kAge >= 18 && kAge <= 21) kidsCost += cfg.kidCollegeCost * eduPriceLevel;
     }
 
     const ltcCount = cfg.ltcActive
@@ -1125,7 +1150,8 @@ function runOnce(cfg) {
       : 0;
     const ltcPremiums = ltcPremiumCount * cfg.ltcPremium * healthInfl;
 
-    const carCost = yrsElapsed > 0 && yrsElapsed % 8 === 0 ? 30000 * infl : 0;
+    const carCost = (cfg.carActive && yrsElapsed > 0 && yrsElapsed % cfg.carInterval === 0)
+                      ? cfg.carCost * infl : 0;
     const repairCost = !homeSold && homeVal > 0 ? cfg.homeRepair * infl : 0;
     const propTax    = homeVal > 0 ? cfg.propTaxRate * homeVal : 0;
 
@@ -1483,6 +1509,13 @@ function readConfig() {
     baseLiving:   document.getElementById('expModeCategory').checked
                     ? expCategoryAnnualTotal()
                     : v('baseLiving'),
+    carActive:    vb('carActive'),
+    carCost:      v('carCost'),
+    carInterval:  Math.max(1, vi('carInterval')),
+    kidBaseCost:    v('kidBaseCost'),
+    kidDaycareCost: v('kidDaycareCost'),
+    kidSchoolCost:  v('kidSchoolCost'),
+    kidCollegeCost: v('kidCollegeCost'),
     ltcActive:    vb('ltcActive'),
     ltcDurationMean: v('ltcDurationMean'),
     ltcDurationStd:  v('ltcDurationStd'),
