@@ -543,6 +543,7 @@ body {
       <div class="section-body">
         <div class="field-row"><label>Current Value ($)</label><input type="number" id="homeValue" value="480000"></div>
         <div class="field-row"><label>Purchase Year</label><input type="number" id="homePurchaseYear" value="2023"></div>
+        <div class="field-row"><label>Original Purchase Price ($)</label><input type="number" id="homePurchasePrice" value="440000"></div>
         <div class="field-row"><label>Down Payment (%)</label><input type="number" id="homeDownPayment" value="20" step="1" min="0" max="100"></div>
         <div class="field-row"><label>Original Term (yrs)</label><input type="number" id="mortgageYears" value="30"></div>
         <div class="field-row"><label>Current Mortgage Rate (%)</label><input type="number" id="currentMortgageRate" value="6.75" step="0.05"></div>
@@ -808,7 +809,7 @@ const COMMA_FORMATTED_IDS = new Set([
   'carCost', 'kidBaseCost', 'kidDaycareCost', 'kidSchoolCost', 'kidCollegeCost',
   'brokerageBalance', 'brokerageBasis', 'hsa', 'ira', 'trad401k', 'roth401k',
   'savings401k', 'spouseSavings401k', 'savingsIra', 'spouseSavingsIra', 'savingsHsa',
-  'homeValue', 'homeRepair', 'newHomeValue',
+  'homeValue', 'homePurchasePrice', 'homeRepair', 'newHomeValue',
   'vacPrice', 'vacMaintenance', 'vacRental',
   'ssPrimary', 'ssSpouse',
   'giftAmount', 'inhAmount',
@@ -1629,10 +1630,7 @@ function readConfig() {
 
     homeValue:        v('homeValue'),
     homePurchaseYear: vi('homePurchaseYear'),
-    // Derived from current home value × (1 − down payment %). Approximate
-    // since homeValue has appreciated since purchase, but it's a reasonable
-    // single-input proxy for the original loan amount.
-    originalMortgage: v('homeValue') * (1 - v('homeDownPayment') / 100),
+    originalMortgage: v('homePurchasePrice') * (1 - v('homeDownPayment') / 100),
     mortgageYears:    vi('mortgageYears'),
     mortgageRate:     v('currentMortgageRate') / 100,
     homeApprec:      v('homeApprec') / 100,
