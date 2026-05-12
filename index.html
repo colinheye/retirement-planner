@@ -175,6 +175,46 @@ body {
 }
 .about-reset-btn:hover { background: #2a3050; color: #cdd3e0; border-color: #5a7de8; }
 
+/* ---- CASH FLOW CHART ---- */
+#chart-section {
+  background: #181c2a;
+  border-bottom: 2px solid #2d3350;
+  padding: 12px 18px 14px;
+  flex-shrink: 0;
+}
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chart-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #cdd3e0;
+}
+.chart-sub { font-size: 10px; color: #7a85a0; }
+#chart-wrap { width: 100%; min-height: 60px; }
+#expenseChart { display: block; width: 100%; }
+#chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.legend-item { display: inline-flex; align-items: center; gap: 5px; color: #aab5cc; }
+.legend-swatch { width: 12px; height: 10px; border-radius: 2px; }
+.legend-line {
+  display: inline-block;
+  width: 18px; height: 0;
+  border-top: 2px dashed #e8ecf4;
+}
+
 /* ---- EXPANDED SECTIONS ROW ---- */
 #expanded-row {
   display: grid;
@@ -336,6 +376,12 @@ body {
   #about-section > summary { font-size: 12px; padding: 12px 16px; }
   .about-body { font-size: 14px; padding: 14px 18px 16px; }
   .about-reset-btn { font-size: 13px; padding: 9px 18px; }
+  #chart-section { padding: 12px 14px; }
+  .chart-title { font-size: 13px; }
+  .chart-sub { font-size: 11px; }
+  #chart-legend { font-size: 13px; gap: 8px 14px; }
+  .legend-swatch { width: 14px; height: 12px; }
+  .legend-line { width: 22px; }
   .exp-mode-toggle label { font-size: 14px; padding: 9px 10px; }
   .exp-subhead { font-size: 12px; }
   .exp-total-row { font-size: 15px; }
@@ -380,6 +426,16 @@ body {
       </p>
     </div>
   </details>
+
+  <!-- CHART (always visible, populated after each simulation run) -->
+  <div id="chart-section">
+    <div class="chart-header">
+      <span class="chart-title">Cash flow — 20th percentile run</span>
+      <span class="chart-sub">Stacked annual expenses; dashed line is total income</span>
+    </div>
+    <div id="chart-wrap"><svg id="expenseChart"></svg></div>
+    <div id="chart-legend"></div>
+  </div>
 
   <!-- EXPANDED SECTIONS -->
   <div id="expanded-row">
@@ -855,6 +911,11 @@ document.getElementById('vacActive').dispatchEvent(new Event('change'));
 document.getElementById('moveToNewHome').dispatchEvent(new Event('change'));
 updateExpenseModeUI();
 updateCarePhasesVisibility();
+
+// Auto-run a simulation on first load so the chart populates without the
+// user having to click. Defer one tick so the browser can paint the UI
+// first; the simulation itself is async and updates the progress bar.
+setTimeout(() => { startSimulation(); }, 0);
 
 // ---- Utilities ----
 function fmt$(n) {
@@ -1449,6 +1510,8 @@ function runOnce(cfg) {
       expHealth:  health,
       expCar:     carCost,
       expRepair:  repairCost,
+      expLtcPrem: ltcPremiums,
+      expVac:     vacCost,
       ssIncome:   ss,
       wageIncome: wage,
     });
@@ -1482,9 +1545,15 @@ async function runMonteCarlo(cfg, onProgress) {
 
 // ---- Result processing ----
 function processResults(allRuns) {
-  const finals = allRuns.map(r => r.history[r.history.length - 1]?.liquidAssets ?? 0);
-  const medianLegacy = percentile(finals, 50);
-  return { medianLegacy };
+  const indexed = allRuns.map((r, i) => ({
+    idx: i,
+    final: r.history[r.history.length - 1]?.liquidAssets ?? 0,
+  }));
+  indexed.sort((a, b) => a.final - b.final);
+  const medianLegacy = percentile(indexed.map(x => x.final), 50);
+  const p20Run = indexed[Math.floor(indexed.length * 0.20)];
+  const p20History = p20Run ? allRuns[p20Run.idx].history : [];
+  return { medianLegacy, p20History };
 }
 
 // ---- Read config from UI ----
@@ -1622,6 +1691,147 @@ function readConfig() {
 }
 
 // ---- Main entry ----
+// ---- Expense / income chart (20th percentile run) ----
+const CHART_CATEGORIES = [
+  { label: 'Living',     color: '#4d8cff', keys: ['expLiving'] },
+  { label: 'Home',       color: '#3eb05a', keys: ['expHome', 'expRepair', 'expVac'] },
+  { label: 'Healthcare', color: '#f08f3c', keys: ['expHealth', 'expLtcPrem'] },
+  { label: 'Other',      color: '#9b7ad6', keys: ['expKids', 'expCar'] },
+];
+
+let _lastChartHistory = null;
+
+function _fmtChartMoney(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return '$' + (n / 1e6).toFixed(abs >= 1e7 ? 0 : 1) + 'M';
+  if (abs >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
+  return '$' + Math.round(n);
+}
+
+function _niceYTicks(yMax, count) {
+  if (yMax <= 0) return [0];
+  const rawStep = yMax / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const candidates = [1, 2, 2.5, 5, 10].map(n => n * mag);
+  const step = candidates.find(s => s >= rawStep) || candidates[candidates.length - 1];
+  const ticks = [];
+  for (let v = 0; v <= yMax + step * 0.5; v += step) ticks.push(v);
+  return ticks;
+}
+
+function _niceXTicks(xMin, xMax) {
+  const range = xMax - xMin;
+  const step = range > 60 ? 20 : range > 30 ? 10 : 5;
+  const ticks = [];
+  for (let v = Math.ceil(xMin / step) * step; v <= xMax; v += step) ticks.push(v);
+  return ticks;
+}
+
+function renderExpenseChart(history) {
+  _lastChartHistory = history;
+  const wrap = document.getElementById('chart-wrap');
+  const svg  = document.getElementById('expenseChart');
+  const legend = document.getElementById('chart-legend');
+  if (!wrap || !svg) return;
+
+  const isPhone = window.innerWidth <= 680;
+  const W = Math.max(280, wrap.clientWidth || 600);
+  const H = isPhone ? Math.max(220, Math.round(W * 0.75))
+                    : Math.max(240, Math.min(360, Math.round(W * 0.42)));
+  const padL = isPhone ? 46 : 52;
+  const padR = 10;
+  const padT = 8;
+  const padB = isPhone ? 30 : 28;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const fsAxis  = isPhone ? 13 : 11;
+  const fsTitle = isPhone ? 11 : 10;
+
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  if (!history || history.length === 0) { svg.innerHTML = ''; return; }
+
+  const data = history.map(h => {
+    const cats = CHART_CATEGORIES.map(c =>
+      c.keys.reduce((s, k) => s + (h[k] || 0), 0)
+    );
+    return {
+      age: h.age,
+      cats,
+      income: (h.wageIncome || 0) + (h.ssIncome || 0),
+      total:  cats.reduce((s, v) => s + v, 0),
+    };
+  });
+
+  const yMaxRaw = Math.max(
+    ...data.map(d => Math.max(d.total, d.income))
+  ) || 1;
+  const yTicks = _niceYTicks(yMaxRaw, 5);
+  const yMax = Math.max(yTicks[yTicks.length - 1], yMaxRaw);
+
+  const ages = data.map(d => d.age);
+  const xMin = ages[0];
+  const xMax = ages[ages.length - 1];
+  const xRange = Math.max(1, xMax - xMin);
+
+  const x = age => padL + (age - xMin) / xRange * innerW;
+  const y = val => padT + innerH - (val / yMax) * innerH;
+
+  const parts = [];
+
+  yTicks.forEach(t => {
+    const yp = y(t);
+    parts.push(`<line x1="${padL}" y1="${yp}" x2="${W - padR}" y2="${yp}" stroke="#2d3350" stroke-width="1"/>`);
+    parts.push(`<text x="${padL - 6}" y="${yp + fsAxis * 0.35}" text-anchor="end" font-size="${fsAxis}" fill="#7a85a0">${_fmtChartMoney(t)}</text>`);
+  });
+
+  _niceXTicks(xMin, xMax).forEach(t => {
+    const xp = x(t);
+    parts.push(`<text x="${xp}" y="${H - padB + fsAxis + 2}" text-anchor="middle" font-size="${fsAxis}" fill="#7a85a0">${t}</text>`);
+  });
+
+  for (let i = 0; i < CHART_CATEGORIES.length; i++) {
+    let topPath = '';
+    let botPath = '';
+    for (let j = 0; j < data.length; j++) {
+      const cumPrev = data[j].cats.slice(0, i).reduce((s, v) => s + v, 0);
+      const cumCurr = cumPrev + data[j].cats[i];
+      topPath += (j === 0 ? 'M' : 'L') + x(data[j].age) + ' ' + y(cumCurr);
+      botPath  = ' L' + x(data[j].age) + ' ' + y(cumPrev) + botPath;
+    }
+    parts.push(`<path d="${topPath}${botPath} Z" fill="${CHART_CATEGORIES[i].color}" opacity="0.88"/>`);
+  }
+
+  let incPath = '';
+  for (let j = 0; j < data.length; j++) {
+    incPath += (j === 0 ? 'M' : 'L') + x(data[j].age) + ' ' + y(data[j].income);
+  }
+  parts.push(`<path d="${incPath}" stroke="#e8ecf4" stroke-width="2" fill="none" stroke-dasharray="6,4"/>`);
+
+  parts.push(`<line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#3a4060" stroke-width="1"/>`);
+  parts.push(`<text x="${padL + innerW / 2}" y="${H - 4}" text-anchor="middle" font-size="${fsTitle}" fill="#5a6480">Age</text>`);
+
+  svg.innerHTML = parts.join('');
+
+  if (legend) {
+    legend.innerHTML =
+      CHART_CATEGORIES.map(c =>
+        `<span class="legend-item"><span class="legend-swatch" style="background:${c.color}"></span>${c.label}</span>`
+      ).join('') +
+      `<span class="legend-item"><span class="legend-line"></span>Total Income</span>`;
+  }
+}
+
+let _chartResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_chartResizeTimer);
+  _chartResizeTimer = setTimeout(() => {
+    if (_lastChartHistory) renderExpenseChart(_lastChartHistory);
+  }, 150);
+});
+
 async function startSimulation() {
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
@@ -1646,6 +1856,7 @@ async function startSimulation() {
   const proc = processResults(allRuns);
   const successRate = 100 * (1 - fails / cfg.simCount);
   document.getElementById('metricSuccess').textContent = successRate.toFixed(1) + '%';
+  renderExpenseChart(proc.p20History);
 
   prog.style.display = 'none';
   progLabel.style.display = 'none';
