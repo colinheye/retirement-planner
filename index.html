@@ -421,11 +421,7 @@ body {
       <div class="section-open-header">Spouse</div>
       <div class="section-body">
         <div class="field-row"><label>Spouse Income ($)</label><input type="number" id="spouseIncome" value="85000"></div>
-        <div class="field-row checkbox-row">
-          <label for="spouseWorks">Spouse Works</label>
-          <input type="checkbox" id="spouseWorks" checked>
-        </div>
-        <div class="field-row" id="spouseStopRow" style="display:none;">
+        <div class="field-row">
           <label>Stop Year (0=until retire)</label>
           <input type="number" id="spouseStopYear" value="0">
         </div>
@@ -576,8 +572,8 @@ body {
       <summary>LTC (Long-Term Care)</summary>
       <div class="section-body">
         <div class="field-row checkbox-row">
-          <label for="ltcActive">LTC Active</label>
-          <input type="checkbox" id="ltcActive" checked>
+          <label for="ltcCovered">LTC Coverage</label>
+          <input type="checkbox" id="ltcCovered" checked>
         </div>
         <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Each person: onset = their death age − drawn duration</div>
         <div class="field-row"><label>LTC Duration Mean (yrs)</label><input type="number" id="ltcDurationMean" value="3" step="0.5"></div>
@@ -624,10 +620,6 @@ body {
     <details open>
       <summary>Guardrails</summary>
       <div class="section-body">
-        <div class="field-row checkbox-row">
-          <label for="guardrailsActive">Active</label>
-          <input type="checkbox" id="guardrailsActive" checked>
-        </div>
         <div class="field-row"><label>Lower Threshold ($)</label><input type="number" id="grLower" value="600000"></div>
         <div class="field-row"><label>Upper Threshold ($)</label><input type="number" id="grUpper" value="4000000"></div>
         <div class="field-row"><label>Spend Cut (%)</label><input type="number" id="grCut" value="10" step="1"></div>
@@ -681,9 +673,6 @@ body {
 'use strict';
 
 // ---- Conditional row visibility ----
-document.getElementById('spouseWorks').addEventListener('change', function() {
-  document.getElementById('spouseStopRow').style.display = this.checked ? 'flex' : 'none';
-});
 document.getElementById('vacActive').addEventListener('change', function() {
   document.getElementById('vacDetailsRow').style.display = this.checked ? 'block' : 'none';
 });
@@ -835,10 +824,9 @@ COMMA_FORMATTED_IDS.forEach(id => {
   const el = document.getElementById(id);
   if (el) el.value = formatWithCommas(el.value);
 });
-// Sync conditional rows to current input state — needed on every load, not
-// just after restore, because the inline display:none on spouseStopRow would
-// otherwise stay hidden until the user toggled the checkbox.
-document.getElementById('spouseWorks').dispatchEvent(new Event('change'));
+// Sync conditional rows to current input state on every load, not just
+// after restore, since the inline display:none on those wrappers would
+// otherwise stick until the user toggled the matching checkbox.
 document.getElementById('vacActive').dispatchEvent(new Event('change'));
 document.getElementById('moveToNewHome').dispatchEvent(new Event('change'));
 updateExpenseModeUI();
@@ -977,10 +965,13 @@ function runOnce(cfg) {
   let healthPriceLevel = 1.0;
   let spendingMult = 1.0;
 
-  const pLtcDur   = cfg.ltcActive ? Math.max(1, Math.round(clamp(normalSample(cfg.ltcDurationMean, cfg.ltcDurationStd), 1, 15))) : 0;
-  const sLtcDur   = cfg.ltcActive ? Math.max(1, Math.round(clamp(normalSample(cfg.ltcDurationMean, cfg.ltcDurationStd), 1, 15))) : 0;
-  const pLtcStart = cfg.ltcActive ? Math.max(70, pLife - pLtcDur) : Infinity;
-  const sLtcStart = cfg.ltcActive ? Math.max(70, sLife - sLtcDur) : Infinity;
+  // LTC events happen regardless of insurance coverage. The cfg.ltcCovered
+  // flag only governs whether premiums are paid and whether the cost is
+  // reduced by cfg.ltcCoverage.
+  const pLtcDur   = Math.max(1, Math.round(clamp(normalSample(cfg.ltcDurationMean, cfg.ltcDurationStd), 1, 15)));
+  const sLtcDur   = Math.max(1, Math.round(clamp(normalSample(cfg.ltcDurationMean, cfg.ltcDurationStd), 1, 15)));
+  const pLtcStart = Math.max(70, pLife - pLtcDur);
+  const sLtcStart = Math.max(70, sLife - sLtcDur);
   const firstLtcAge = Math.min(pLtcStart, sLtcStart);
 
   const taxEngine = new TaxEngine();
@@ -1032,7 +1023,7 @@ function runOnce(cfg) {
     }
 
     // --- LTC home sale ---
-    if (cfg.ltcActive && age === firstLtcAge && !homeSold && homeVal > 0) {
+    if (age === firstLtcAge && !homeSold && homeVal > 0) {
       const sellCosts = homeVal * 0.06;
       const netProceeds = Math.max(0, homeVal - homeMortgage - sellCosts);
       brokBal   += netProceeds;
@@ -1079,13 +1070,10 @@ function runOnce(cfg) {
     let spouseWage = 0;
 
     if (!isRetired) {
-      // Spouse working logic
-      if (cfg.spouseWorks) {
-        const stopYr = cfg.spouseStopYear === 0 ? null : cfg.spouseStopYear;
-        spouseWorking = stopYr === null || yr < stopYr;
-      } else {
-        spouseWorking = false;
-      }
+      // Spouse working logic — 0 means "until retirement"; any other value
+      // is the calendar year they stop.
+      const stopYr = cfg.spouseStopYear === 0 ? null : cfg.spouseStopYear;
+      spouseWorking = stopYr === null || yr < stopYr;
       if (!spouseWorking) {
         incomeReduc = true;
       } else {
@@ -1130,14 +1118,15 @@ function runOnce(cfg) {
       else if (kAge >= 18 && kAge <= 21) kidsCost += cfg.kidCollegeCost * eduPriceLevel;
     }
 
-    const ltcCount = cfg.ltcActive
-      ? (age >= pLtcStart && age < pLife ? 1 : 0) + (age >= sLtcStart && age < sLife ? 1 : 0)
-      : 0;
-    const ltcPremiumCount = cfg.ltcActive
+    const ltcCount = (age >= pLtcStart && age < pLife ? 1 : 0)
+                   + (age >= sLtcStart && age < sLife ? 1 : 0);
+    // Premiums and coverage discount only apply when the user has LTC insurance.
+    const ltcPremiumCount = cfg.ltcCovered
       ? (age < pLtcStart && age < pLife ? 1 : 0) + (age < sLtcStart && age < sLife ? 1 : 0)
       : 0;
+    const coverageFrac = cfg.ltcCovered ? cfg.ltcCoverage : 0;
     const health = isRetired
-      ? (12000 * healthInfl + ltcCount * cfg.ltcCost * (1 - cfg.ltcCoverage) * healthInfl)
+      ? (12000 * healthInfl + ltcCount * cfg.ltcCost * (1 - coverageFrac) * healthInfl)
       : 0;
     const ltcPremiums = ltcPremiumCount * cfg.ltcPremium * healthInfl;
 
@@ -1360,7 +1349,7 @@ function runOnce(cfg) {
     let liq = hsa + ira + trad401k + roth401k + brokBal;
 
     // Guardrails
-    if (isRetired && cfg.guardrailsActive) {
+    if (isRetired) {
       if (liq < cfg.grLower * infl) {
         spendingMult = Math.max(1 - cfg.grMaxCut, spendingMult * (1 - cfg.grCut));
       } else if (liq > cfg.grUpper * infl) {
@@ -1459,11 +1448,7 @@ function readConfig() {
     { start: 13, end: 99, spouseIncome: v('cpIncome13') },
   ];
 
-  const spouseWorks = vb('spouseWorks');
-  let spouseStopYear = 0;
-  if (spouseWorks) {
-    spouseStopYear = vi('spouseStopYear');
-  }
+  const spouseStopYear = vi('spouseStopYear');
 
   return {
     startYear:       vi('startYear'),
@@ -1491,7 +1476,6 @@ function readConfig() {
     ssHaircutStd: v('ssHaircutStd') / 100,
 
     spouseIncome:    v('spouseIncome'),
-    spouseWorks,
     spouseStopYear,
 
     childBirthYears,
@@ -1506,7 +1490,7 @@ function readConfig() {
     kidDaycareCost: v('kidDaycareCost'),
     kidSchoolCost:  v('kidSchoolCost'),
     kidCollegeCost: v('kidCollegeCost'),
-    ltcActive:    vb('ltcActive'),
+    ltcCovered:   vb('ltcCovered'),
     ltcDurationMean: v('ltcDurationMean'),
     ltcDurationStd:  v('ltcDurationStd'),
     ltcCost:      v('ltcCost'),
@@ -1553,7 +1537,6 @@ function readConfig() {
     bondStd:   v('bondStd') / 100,
 
     glidePath:        vb('glidePath'),
-    guardrailsActive: vb('guardrailsActive'),
     grLower:    v('grLower'),
     grUpper:    v('grUpper'),
     grCut:      v('grCut') / 100,
