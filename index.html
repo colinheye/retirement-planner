@@ -1498,11 +1498,15 @@ function runOnce(cfg) {
       }
     }
 
-    // Zero out all wealth permanently on failure
+    // Zero out liquid wealth permanently on failure. The primary home is
+    // intentionally NOT zeroed here — even with no cash to pay them, property
+    // tax and maintenance are real ongoing obligations and should keep
+    // showing in the chart. The only thing that legitimately ends home
+    // expenses is the LTC home sale (if enabled). The vacation home was
+    // already sold during the pre-failure rescue above.
     if (failed) {
       hsa = 0; ira = 0; trad401k = 0; roth401k = 0;
       brokBal = 0; brokBasis = 0;
-      homeVal = 0; homeMortgage = 0; mortgagePmt = 0;
       vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
       liq = 0;
     }
