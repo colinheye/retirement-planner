@@ -470,8 +470,8 @@ body {
       <div class="section-body">
         <div class="field-row"><label>Spouse Income ($)</label><input type="number" id="spouseIncome" value="100000"></div>
         <div class="field-row">
-          <label>Stop Year (0=until retire)</label>
-          <input type="number" id="spouseStopYear" value="0">
+          <label>Work Until Age (0=until retire)</label>
+          <input type="number" id="spouseStopAge" value="0">
         </div>
       </div>
     </div>
@@ -556,7 +556,7 @@ body {
           <input type="checkbox" id="moveToNewHome" checked>
         </div>
         <div id="moveDetails">
-          <div class="field-row"><label>Sell/Move Year (elapsed)</label><input type="number" id="houseSellYear" value="8"></div>
+          <div class="field-row"><label>Sell/Move Year</label><input type="number" id="houseSellYear" value="2034"></div>
           <div class="field-row"><label>New Home Value ($)</label><input type="number" id="newHomeValue" value="550000"></div>
           <div class="field-row"><label>Down Payment (%)</label><input type="number" id="newDownPayment" value="20" step="1" min="0" max="100"></div>
           <div class="field-row"><label>New Mortgage Rate (%)</label><input type="number" id="newMortgageRate" value="6.50" step="0.1"></div>
@@ -573,7 +573,7 @@ body {
           <input type="checkbox" id="vacActive">
         </div>
         <div id="vacDetailsRow">
-          <div class="field-row"><label>Buy Year (elapsed)</label><input type="number" id="vacBuyYear" value="5"></div>
+          <div class="field-row"><label>Buy Year</label><input type="number" id="vacBuyYear" value="2031"></div>
           <div class="field-row"><label>Purchase Price ($)</label><input type="number" id="vacPrice" value="600000"></div>
           <div class="field-row"><label>Down Payment (%)</label><input type="number" id="vacDown" value="20" step="5"></div>
           <div class="field-row"><label>Mortgage Rate (%)</label><input type="number" id="vacMortgageRate" value="6.75" step="0.05"></div>
@@ -1095,7 +1095,7 @@ function runOnce(cfg) {
     const yrsElapsed = yr - cfg.startYear;
 
     // --- HOUSE EVENT ---
-    if (cfg.moveToNewHome && yrsElapsed === cfg.houseSellYear && !homeSold) {
+    if (cfg.moveToNewHome && yr === cfg.houseSellYear && !homeSold) {
       const sellCosts = homeVal * 0.06;
       const netProceeds = homeVal - homeMortgage - sellCosts;
       const newP = cfg.newHomeValue * infl;
@@ -1127,7 +1127,7 @@ function runOnce(cfg) {
     }
 
     // --- VACATION HOME BUY / SELL ---
-    if (cfg.vacActive && yrsElapsed === cfg.vacBuyYear && !vacActive) {
+    if (cfg.vacActive && yr === cfg.vacBuyYear && !vacActive) {
       const price = cfg.vacPrice * infl;
       const own = cfg.vacOwnership / 100;
       const loan = (price - price * cfg.vacDown / 100) * own;
@@ -1139,7 +1139,7 @@ function runOnce(cfg) {
       vacMortgagePmt = mortgagePayment(loan, cfg.vacMortgageRate, cfg.vacMortgageYears);
       vacActive = true;
     }
-    if (cfg.vacActive && cfg.vacSellYear > 0 && yrsElapsed === cfg.vacSellYear && vacActive) {
+    if (cfg.vacActive && cfg.vacSellYear > 0 && yr === cfg.vacSellYear && vacActive) {
       const net = Math.max(0, vacHomeVal * (cfg.vacOwnership / 100) * (1 - 0.06) - vacMortgage);
       brokBal += net; brokBasis += net;
       vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
@@ -1164,10 +1164,10 @@ function runOnce(cfg) {
     let spouseWage = 0;
 
     if (!isRetired) {
-      // Spouse working logic — 0 means "until retirement"; any other value
-      // is the calendar year they stop.
-      const stopYr = cfg.spouseStopYear === 0 ? null : cfg.spouseStopYear;
-      spouseWorking = stopYr === null || yr < stopYr;
+      // Spouse working logic — 0 means "until retirement"; any other value is
+      // the age at which the spouse stops. Spouse age assumed equal to primary.
+      const stopAge = cfg.spouseStopAge === 0 ? cfg.retirementAge : cfg.spouseStopAge;
+      spouseWorking = age < stopAge;
       if (!spouseWorking) {
         incomeReduc = true;
       } else {
@@ -1582,7 +1582,7 @@ function readConfig() {
     { start: 13, end: 99, spouseIncome: v('cpIncome13') },
   ];
 
-  const spouseStopYear = vi('spouseStopYear');
+  const spouseStopAge = vi('spouseStopAge');
 
   return {
     startYear:       vi('startYear'),
@@ -1615,7 +1615,7 @@ function readConfig() {
     ssHaircutStd: v('ssHaircutStd') / 100,
 
     spouseIncome:    v('spouseIncome'),
-    spouseStopYear,
+    spouseStopAge,
 
     childBirthYears,
     carePhases,
