@@ -402,16 +402,6 @@ body {
       <div class="section-open-header">Expenses</div>
       <div class="section-body">
         <div class="field-row"><label>Base Living Expenses ($)</label><input type="number" id="baseLiving" value="78000"></div>
-        <div class="field-row checkbox-row">
-          <label for="ltcActive">LTC Active</label>
-          <input type="checkbox" id="ltcActive" checked>
-        </div>
-        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Each person: onset = their death age − drawn duration</div>
-        <div class="field-row"><label>LTC Duration Mean (yrs)</label><input type="number" id="ltcDurationMean" value="3" step="0.5"></div>
-        <div class="field-row"><label>LTC Duration Std (yrs)</label><input type="number" id="ltcDurationStd" value="2" step="0.5"></div>
-        <div class="field-row"><label>LTC Annual Cost ($)</label><input type="number" id="ltcCost" value="90000"></div>
-        <div class="field-row"><label>LTC Coverage (%)</label><input type="number" id="ltcCoverage" value="50" step="5" min="0" max="100"></div>
-        <div class="field-row"><label>LTC Premium / person ($)</label><input type="number" id="ltcPremium" value="3000" step="500"></div>
       </div>
     </div>
 
@@ -427,9 +417,15 @@ body {
         <div class="field-row"><label>Appreciation Rate (%)</label><input type="number" id="homeApprec" value="3" step="0.1"></div>
         <div class="field-row"><label>Property Tax Rate (%)</label><input type="number" id="propTaxRate" value="1.0" step="0.1"></div>
         <div class="field-row"><label>Annual Maintenance ($)</label><input type="number" id="homeRepair" value="10000" step="1000"></div>
-        <div class="field-row"><label>Sell/Move Year (elapsed)</label><input type="number" id="houseSellYear" value="8"></div>
-        <div class="field-row"><label>New Home Value ($)</label><input type="number" id="newHomeValue" value="550000"></div>
-        <div class="field-row"><label>New Mortgage Rate (%)</label><input type="number" id="newMortgageRate" value="6.50" step="0.1"></div>
+        <div class="field-row checkbox-row">
+          <label for="moveToNewHome">Move to New Home</label>
+          <input type="checkbox" id="moveToNewHome" checked>
+        </div>
+        <div id="moveDetails">
+          <div class="field-row"><label>Sell/Move Year (elapsed)</label><input type="number" id="houseSellYear" value="8"></div>
+          <div class="field-row"><label>New Home Value ($)</label><input type="number" id="newHomeValue" value="550000"></div>
+          <div class="field-row"><label>New Mortgage Rate (%)</label><input type="number" id="newMortgageRate" value="6.50" step="0.1"></div>
+        </div>
       </div>
     </div>
 
@@ -441,16 +437,18 @@ body {
           <label for="vacActive">Active</label>
           <input type="checkbox" id="vacActive">
         </div>
-        <div class="field-row"><label>Buy Year (elapsed)</label><input type="number" id="vacBuyYear" value="5"></div>
-        <div class="field-row"><label>Purchase Price ($)</label><input type="number" id="vacPrice" value="600000"></div>
-        <div class="field-row"><label>Down Payment (%)</label><input type="number" id="vacDown" value="20" step="5"></div>
-        <div class="field-row"><label>Mortgage Rate (%)</label><input type="number" id="vacMortgageRate" value="6.75" step="0.05"></div>
-        <div class="field-row"><label>Mortgage Years</label><input type="number" id="vacMortgageYears" value="30"></div>
-        <div class="field-row"><label>Property Tax Rate (%)</label><input type="number" id="vacPropTax" value="1.0" step="0.1"></div>
-        <div class="field-row"><label>Annual Maintenance ($)</label><input type="number" id="vacMaintenance" value="6000" step="1000"></div>
-        <div class="field-row"><label>Annual Rental Income ($)</label><input type="number" id="vacRental" value="0" step="5000"></div>
-        <div class="field-row"><label>Sell Year (0=never)</label><input type="number" id="vacSellYear" value="0"></div>
-        <div class="field-row"><label>Your Ownership (%)</label><input type="number" id="vacOwnership" value="50" step="5" min="1" max="100"></div>
+        <div id="vacDetailsRow">
+          <div class="field-row"><label>Buy Year (elapsed)</label><input type="number" id="vacBuyYear" value="5"></div>
+          <div class="field-row"><label>Purchase Price ($)</label><input type="number" id="vacPrice" value="600000"></div>
+          <div class="field-row"><label>Down Payment (%)</label><input type="number" id="vacDown" value="20" step="5"></div>
+          <div class="field-row"><label>Mortgage Rate (%)</label><input type="number" id="vacMortgageRate" value="6.75" step="0.05"></div>
+          <div class="field-row"><label>Mortgage Years</label><input type="number" id="vacMortgageYears" value="30"></div>
+          <div class="field-row"><label>Property Tax Rate (%)</label><input type="number" id="vacPropTax" value="1.0" step="0.1"></div>
+          <div class="field-row"><label>Annual Maintenance ($)</label><input type="number" id="vacMaintenance" value="6000" step="1000"></div>
+          <div class="field-row"><label>Annual Rental Income ($)</label><input type="number" id="vacRental" value="0" step="5000"></div>
+          <div class="field-row"><label>Sell Year (0=never)</label><input type="number" id="vacSellYear" value="0"></div>
+          <div class="field-row"><label>Your Ownership (%)</label><input type="number" id="vacOwnership" value="50" step="5" min="1" max="100"></div>
+        </div>
       </div>
     </div>
 
@@ -458,6 +456,18 @@ body {
 
   <!-- ACCORDION GRID (2 rows × 4 cols) -->
   <div id="accordion-grid">
+
+    <!-- Windfalls -->
+    <details open>
+      <summary>Windfalls</summary>
+      <div class="section-body">
+        <div class="field-row"><label>Annual Gift ($)</label><input type="number" id="giftAmount" value="8000"></div>
+        <div class="field-row"><label>Gift Years Remaining</label><input type="number" id="giftYears" value="3"></div>
+        <div class="field-row"><label>Inheritance Amount ($)</label><input type="number" id="inhAmount" value="250000"></div>
+        <div class="field-row"><label>Expected Year</label><input type="number" id="inhYear" value="2048"></div>
+        <div class="field-row"><label>Probability (%)</label><input type="number" id="inhProb" value="40" step="1"></div>
+      </div>
+    </details>
 
     <!-- Accounts -->
     <details open>
@@ -472,6 +482,23 @@ body {
       </div>
     </details>
 
+    <!-- LTC -->
+    <details open>
+      <summary>LTC (Long-Term Care)</summary>
+      <div class="section-body">
+        <div class="field-row checkbox-row">
+          <label for="ltcActive">LTC Active</label>
+          <input type="checkbox" id="ltcActive" checked>
+        </div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Each person: onset = their death age − drawn duration</div>
+        <div class="field-row"><label>LTC Duration Mean (yrs)</label><input type="number" id="ltcDurationMean" value="3" step="0.5"></div>
+        <div class="field-row"><label>LTC Duration Std (yrs)</label><input type="number" id="ltcDurationStd" value="2" step="0.5"></div>
+        <div class="field-row"><label>LTC Annual Cost ($)</label><input type="number" id="ltcCost" value="90000"></div>
+        <div class="field-row"><label>LTC Coverage (%)</label><input type="number" id="ltcCoverage" value="50" step="5" min="0" max="100"></div>
+        <div class="field-row"><label>LTC Premium / person ($)</label><input type="number" id="ltcPremium" value="3000" step="500"></div>
+      </div>
+    </details>
+
     <!-- Social Security -->
     <details open>
       <summary>Social Security</summary>
@@ -482,18 +509,6 @@ body {
         <div class="field-row"><label>Haircut Mean (%)</label><input type="number" id="ssHaircut" value="80" step="1"></div>
         <div class="field-row"><label>Haircut Std (%)</label><input type="number" id="ssHaircutStd" value="15" step="1"></div>
         <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">Drawn once per run — models policy/solvency risk</div>
-      </div>
-    </details>
-
-    <!-- Windfalls -->
-    <details open>
-      <summary>Windfalls</summary>
-      <div class="section-body">
-        <div class="field-row"><label>Annual Gift ($)</label><input type="number" id="giftAmount" value="8000"></div>
-        <div class="field-row"><label>Gift Years Remaining</label><input type="number" id="giftYears" value="3"></div>
-        <div class="field-row"><label>Inheritance Amount ($)</label><input type="number" id="inhAmount" value="250000"></div>
-        <div class="field-row"><label>Expected Year</label><input type="number" id="inhYear" value="2048"></div>
-        <div class="field-row"><label>Probability (%)</label><input type="number" id="inhProb" value="40" step="1"></div>
       </div>
     </details>
 
@@ -576,9 +591,15 @@ body {
 <script>
 'use strict';
 
-// ---- Spouse UI toggle ----
+// ---- Conditional row visibility ----
 document.getElementById('spouseWorks').addEventListener('change', function() {
   document.getElementById('spouseStopRow').style.display = this.checked ? 'flex' : 'none';
+});
+document.getElementById('vacActive').addEventListener('change', function() {
+  document.getElementById('vacDetailsRow').style.display = this.checked ? 'block' : 'none';
+});
+document.getElementById('moveToNewHome').addEventListener('change', function() {
+  document.getElementById('moveDetails').style.display = this.checked ? 'block' : 'none';
 });
 
 // ---- Care phases: show when children are entered ----
@@ -684,6 +705,8 @@ COMMA_FORMATTED_IDS.forEach(id => {
 // just after restore, because the inline display:none on spouseStopRow would
 // otherwise stay hidden until the user toggled the checkbox.
 document.getElementById('spouseWorks').dispatchEvent(new Event('change'));
+document.getElementById('vacActive').dispatchEvent(new Event('change'));
+document.getElementById('moveToNewHome').dispatchEvent(new Event('change'));
 updateCarePhasesVisibility();
 
 // ---- Utilities ----
@@ -852,7 +875,7 @@ function runOnce(cfg) {
     const yrsElapsed = yr - cfg.startYear;
 
     // --- HOUSE EVENT ---
-    if (yrsElapsed === cfg.houseSellYear && !homeSold) {
+    if (cfg.moveToNewHome && yrsElapsed === cfg.houseSellYear && !homeSold) {
       const sellCosts = homeVal * 0.06;
       const netProceeds = homeVal - homeMortgage - sellCosts;
       const newP = cfg.newHomeValue * infl;
@@ -1354,6 +1377,7 @@ function readConfig() {
     homeApprec:      v('homeApprec') / 100,
     propTaxRate:     v('propTaxRate') / 100,
     homeRepair:      v('homeRepair'),
+    moveToNewHome:   vb('moveToNewHome'),
     houseSellYear:   vi('houseSellYear'),
     newHomeValue:    v('newHomeValue'),
     newMortgageRate: v('newMortgageRate') / 100,
