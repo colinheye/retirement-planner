@@ -457,6 +457,7 @@ body {
     <div class="section-open">
       <div class="section-open-header">Expenses</div>
       <div class="section-body">
+        <div style="font-size:11px;color:#7a85a0;margin:0 0 8px;">Other than housing costs.</div>
         <div class="exp-mode-toggle">
           <label><input type="radio" name="expMode" id="expModeTotal" value="total" checked><span>Annual total</span></label>
           <label><input type="radio" name="expMode" id="expModeCategory" value="category"><span>By category</span></label>
@@ -487,15 +488,9 @@ body {
           </div>
         </div>
 
-        <div class="exp-subhead">Car (applies in either mode)</div>
-        <div class="field-row checkbox-row">
-          <label for="carActive">Active</label>
-          <input type="checkbox" id="carActive" checked>
-        </div>
-        <div id="carDetailsRow">
-          <div class="field-row"><label>Cost per Purchase ($)</label><input type="number" id="carCost" value="30000"></div>
-          <div class="field-row"><label>Interval (yrs)</label><input type="number" id="carInterval" value="8"></div>
-        </div>
+        <div class="exp-subhead">Car</div>
+        <div class="field-row"><label>Cost per Purchase ($)</label><input type="number" id="carCost" value="30000"></div>
+        <div class="field-row"><label>Interval (yrs)</label><input type="number" id="carInterval" value="8"></div>
       </div>
     </div>
 
@@ -695,9 +690,6 @@ document.getElementById('vacActive').addEventListener('change', function() {
 document.getElementById('moveToNewHome').addEventListener('change', function() {
   document.getElementById('moveDetails').style.display = this.checked ? 'block' : 'none';
 });
-document.getElementById('carActive').addEventListener('change', function() {
-  document.getElementById('carDetailsRow').style.display = this.checked ? 'block' : 'none';
-});
 
 // ---- Expense input mode toggle (annual total / by category) ----
 const EXP_MONTHLY_IDS = ['expGroceries', 'expDining', 'expUtilities', 'expTransport',
@@ -849,7 +841,6 @@ COMMA_FORMATTED_IDS.forEach(id => {
 document.getElementById('spouseWorks').dispatchEvent(new Event('change'));
 document.getElementById('vacActive').dispatchEvent(new Event('change'));
 document.getElementById('moveToNewHome').dispatchEvent(new Event('change'));
-document.getElementById('carActive').dispatchEvent(new Event('change'));
 updateExpenseModeUI();
 updateCarePhasesVisibility();
 
@@ -1150,7 +1141,7 @@ function runOnce(cfg) {
       : 0;
     const ltcPremiums = ltcPremiumCount * cfg.ltcPremium * healthInfl;
 
-    const carCost = (cfg.carActive && yrsElapsed > 0 && yrsElapsed % cfg.carInterval === 0)
+    const carCost = (yrsElapsed > 0 && yrsElapsed % cfg.carInterval === 0)
                       ? cfg.carCost * infl : 0;
     const repairCost = !homeSold && homeVal > 0 ? cfg.homeRepair * infl : 0;
     const propTax    = homeVal > 0 ? cfg.propTaxRate * homeVal : 0;
@@ -1509,7 +1500,6 @@ function readConfig() {
     baseLiving:   document.getElementById('expModeCategory').checked
                     ? expCategoryAnnualTotal()
                     : v('baseLiving'),
-    carActive:    vb('carActive'),
     carCost:      v('carCost'),
     carInterval:  Math.max(1, vi('carInterval')),
     kidBaseCost:    v('kidBaseCost'),
