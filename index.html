@@ -555,6 +555,14 @@ body {
         <div class="field-row"><label>IRA ($)</label><input type="number" id="ira" value="45000"></div>
         <div class="field-row"><label>Trad 401k ($)</label><input type="number" id="trad401k" value="500000"></div>
         <div class="field-row"><label>Roth 401k ($)</label><input type="number" id="roth401k" value="55000"></div>
+
+        <div class="exp-subhead">Annual contributions (today's $)</div>
+        <div class="field-row"><label>Your 401k ($/yr)</label><input type="number" id="savings401k" value="23000"></div>
+        <div class="field-row"><label>Spouse 401k ($/yr)</label><input type="number" id="spouseSavings401k" value="23000"></div>
+        <div class="field-row"><label>Your IRA ($/yr)</label><input type="number" id="savingsIra" value="7000"></div>
+        <div class="field-row"><label>Spouse IRA ($/yr)</label><input type="number" id="spouseSavingsIra" value="7000"></div>
+        <div class="field-row"><label>HSA ($/yr)</label><input type="number" id="savingsHsa" value="8300"></div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Each capped by the IRS limit (with age-based catch-ups) and your earned income. Set to 0 to skip a bucket.</div>
       </div>
     </div>
 
@@ -732,6 +740,7 @@ const COMMA_FORMATTED_IDS = new Set([
   'expTravel', 'expGiftsCharity', 'expOtherAnnual',
   'carCost', 'kidBaseCost', 'kidDaycareCost', 'kidSchoolCost', 'kidCollegeCost',
   'brokerageBalance', 'brokerageBasis', 'hsa', 'ira', 'trad401k', 'roth401k',
+  'savings401k', 'spouseSavings401k', 'savingsIra', 'spouseSavingsIra', 'savingsHsa',
   'homeValue', 'originalMortgage', 'homeRepair', 'newHomeValue',
   'vacPrice', 'vacMaintenance', 'vacRental',
   'ssPrimary', 'ssSpouse',
@@ -1182,14 +1191,28 @@ function runOnce(cfg) {
 
     // --- TAX & FLOW ---
     if (!isRetired) {
-      // Catch-up limits
+      // Per-person IRS catch-up limits
       const catchup401k = (age >= 60 && age <= 63) ? 11250 : (age >= 50 ? 7500 : 0);
       const catchupHsa  = age >= 55 ? 1000 : 0;
       const catchupIra  = age >= 50 ? 1000 : 0;
 
-      const employedAdults = spouseWorking ? 2 : 1;
-      const pretax401k = Math.min(wage, (23000 + catchup401k) * infl * employedAdults);
-      const pretaxHsa  = Math.min(Math.max(0, wage - pretax401k), (8300 + catchupHsa) * infl);
+      const limit401k = (23000 + catchup401k) * infl;
+      const limitHsa  = (8300  + catchupHsa)  * infl;
+      const limitIra  = (7000  + catchupIra)  * infl;
+
+      // 401k: each person's contribution is capped by their own wage and the
+      // IRS per-person limit. Spouse only contributes when working.
+      const yourGross = income * infl;
+      const your401k   = Math.min(cfg.savings401k * infl, limit401k, yourGross);
+      const spouse401k = spouseWorking
+                          ? Math.min(cfg.spouseSavings401k * infl, limit401k, spouseWage)
+                          : 0;
+      const pretax401k = your401k + spouse401k;
+
+      // HSA: household-level contribution, capped by remaining wages and IRS limit.
+      const pretaxHsa = Math.min(cfg.savingsHsa * infl,
+                                 limitHsa,
+                                 Math.max(0, wage - pretax401k));
       const taxableWage = wage - pretax401k - pretaxHsa;
 
       const tax = taxEngine.calcTax(taxableWage, 0);
@@ -1211,7 +1234,12 @@ function runOnce(cfg) {
 
       if (net > 0) {
         let avail = net;
-        const iraSave = Math.min(avail, (7000 + catchupIra) * infl * 2);
+        // IRA per-person target, capped by IRS limit. Spousal IRA allowed
+        // for a non-working spouse if filing jointly, so don't gate spouse
+        // on spouseWorking.
+        const yourIra   = Math.min(cfg.savingsIra       * infl, limitIra);
+        const spouseIra = Math.min(cfg.spouseSavingsIra * infl, limitIra);
+        const iraSave   = Math.min(avail, yourIra + spouseIra);
         ira    += iraSave;
         avail  -= iraSave;
         brokBal   += avail;
@@ -1466,6 +1494,11 @@ function readConfig() {
     ira:              v('ira'),
     trad401k:         v('trad401k'),
     roth401k:         v('roth401k'),
+    savings401k:        v('savings401k'),
+    spouseSavings401k:  v('spouseSavings401k'),
+    savingsIra:         v('savingsIra'),
+    spouseSavingsIra:   v('spouseSavingsIra'),
+    savingsHsa:         v('savingsHsa'),
 
     yourIncome:   v('yourIncome'),
     rgMean:       v('rgMean') / 100,
