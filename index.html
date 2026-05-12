@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monte Carlo Retirement Planner</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1e2130;
+  color: #cdd3e0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---- TOP BAR ---- */
+#topbar {
+  background: #181c2a;
+  border-bottom: 2px solid #2d3350;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+#topbar-title h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e8ecf4;
+  letter-spacing: 0.3px;
+}
+#topbar-title p {
+  font-size: 11px;
+  color: #7a85a0;
+  margin-top: 1px;
+}
+#topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+#successWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+#successWrap .success-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #7a85a0;
+}
+#successWrap .success-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #27ae60;
+  line-height: 1;
+}
+#runBtn {
+  padding: 9px 22px;
+  background: #3d5ede;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+#runBtn:hover { background: #4a6eee; }
+#runBtn:disabled { background: #3a4060; color: #6a75a0; cursor: not-allowed; }
+
+/* ---- PROGRESS BAR ---- */
+#progressWrap {
+  display: none;
+  background: #2d3350;
+  height: 5px;
+  flex-shrink: 0;
+}
+#progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, #3d5ede, #56a0ff);
+  width: 0%;
+  transition: width 0.2s ease;
+}
+#progressLabel {
+  display: none;
+  font-size: 10px;
+  color: #7a85a0;
+  padding: 3px 20px 2px;
+  background: #181c2a;
+  flex-shrink: 0;
+  border-bottom: 1px solid #2d3350;
+}
+
+/* ---- CONTENT AREA ---- */
+#content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+#content::-webkit-scrollbar { width: 6px; }
+#content::-webkit-scrollbar-track { background: #181c2a; }
+#content::-webkit-scrollbar-thumb { background: #3a4060; border-radius: 3px; }
+
+/* ---- EXPANDED SECTIONS ROW ---- */
+#expanded-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-bottom: 2px solid #2d3350;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.section-open {
+  border-right: 1px solid #2d3350;
+}
+.section-open:last-child { border-right: none; }
+
+.section-open-header {
+  padding: 8px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #8a95b0;
+  border-bottom: 1px solid #2d3350;
+  background: #191d2e;
+}
+
+.section-body {
+  padding: 8px 14px 10px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  gap: 8px;
+}
+.field-row label {
+  font-size: 11px;
+  color: #8a95b0;
+  min-width: 115px;
+  flex-shrink: 0;
+}
+.field-row input[type="text"],
+.field-row input[type="number"],
+.field-row select {
+  flex: 1;
+  background: #252840;
+  border: 1px solid #3a4060;
+  color: #dde3ef;
+  border-radius: 4px;
+  padding: 4px 7px;
+  font-size: 12px;
+  outline: none;
+  min-width: 0;
+}
+.field-row input:focus,
+.field-row select:focus {
+  border-color: #5a7de8;
+  background: #2a3050;
+}
+.field-row input[type="checkbox"] {
+  width: 14px; height: 14px;
+  cursor: pointer;
+  accent-color: #5a7de8;
+}
+.field-row.checkbox-row label { cursor: pointer; color: #aab5cc; }
+
+/* ---- ACCORDION GRID ---- */
+#accordion-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 1;
+}
+
+#accordion-grid details {
+  border-right: 1px solid #2d3350;
+  border-bottom: 1px solid #2d3350;
+}
+#accordion-grid details:nth-child(4n) { border-right: none; }
+
+/* ---- RESPONSIVE BREAKPOINTS ---- */
+@media (max-width: 1100px) {
+  #expanded-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #accordion-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #accordion-grid details:nth-child(4n) { border-right: 1px solid #2d3350; }
+  #accordion-grid details:nth-child(2n) { border-right: none; }
+}
+@media (max-width: 680px) {
+  #expanded-row { grid-template-columns: 1fr; }
+  .section-open { border-right: none; }
+  #accordion-grid { grid-template-columns: 1fr; }
+  #accordion-grid details:nth-child(2n) { border-right: none; }
+  #accordion-grid details { border-right: none; }
+}
+
+#accordion-grid details summary {
+  padding: 8px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #8a95b0;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  background: #191d2e;
+}
+#accordion-grid details summary::-webkit-details-marker { display: none; }
+#accordion-grid details summary::before {
+  content: '▶';
+  font-size: 9px;
+  transition: transform 0.15s;
+  color: #5a6480;
+}
+#accordion-grid details[open] summary::before { transform: rotate(90deg); }
+#accordion-grid details summary:hover { background: #222640; color: #b0bcd0; }
+</style>
+</head>
+<body>
+
+<!-- ==================== TOP BAR ==================== -->
+<div id="topbar">
+  <div id="topbar-title">
+    <h1>Monte Carlo Retirement Planner</h1>
+    <p>Stochastic simulation engine</p>
+  </div>
+  <div id="topbar-controls">
+    <div id="successWrap">
+      <div class="success-label">Success Rate</div>
+      <div class="success-value" id="metricSuccess">—</div>
+    </div>
+    <button id="runBtn" onclick="startSimulation()">Run Simulation</button>
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div id="progressWrap"><div id="progressBar"></div></div>
+<div id="progressLabel"></div>
+
+<!-- ==================== CONTENT ==================== -->
+<div id="content">
+
+  <!-- EXPANDED SECTIONS -->
+  <div id="expanded-row">
+
+    <!-- INCOME -->
+    <div class="section-open">
+      <div class="section-open-header">Income</div>
+      <div class="section-body">
+        <div class="field-row"><label>Your Income (today's $)</label><input type="number" id="yourIncome" value="115000"></div>
+        <div class="field-row"><label>Real Growth Mean (%)</label><input type="number" id="rgMean" value="1.5" step="0.1"></div>
+        <div class="field-row"><label>Real Growth Std (%)</label><input type="number" id="rgStd" value="4.0" step="0.1"></div>
+        <div class="field-row"><label>Income Floor (%)</label><input type="number" id="incomeFloor" value="60" step="1"></div>
+      </div>
+    </div>
+
+    <!-- SPOUSE -->
+    <div class="section-open">
+      <div class="section-open-header">Spouse</div>
+      <div class="section-body">
+        <div class="field-row"><label>Spouse Income ($)</label><input type="number" id="spouseIncome" value="85000"></div>
+        <div class="field-row checkbox-row">
+          <label for="spouseWorks">Spouse Works</label>
+          <input type="checkbox" id="spouseWorks" checked>
+        </div>
+        <div class="field-row" id="spouseStopRow" style="display:none;">
+          <label>Stop Year (0=until retire)</label>
+          <input type="number" id="spouseStopYear" value="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- CHILDREN -->
+    <div class="section-open">
+      <div class="section-open-header">Children</div>
+      <div class="section-body">
+        <div class="field-row"><label>Birth Years (comma-sep)</label><input type="text" id="childBirthYears" value="" placeholder="e.g. 2027,2029"></div>
+        <div id="carePhasesSection">
+          <div style="font-size:11px;color:#7a85a0;margin:6px 0 4px;">Spouse income by child age (added to your income)</div>
+          <div class="field-row"><label>Ages 0–5 spouse income ($)</label><input type="number" id="cpIncome0" value="0" step="10000"></div>
+          <div class="field-row"><label>Ages 6–12 spouse income ($)</label><input type="number" id="cpIncome6" value="0" step="10000"></div>
+          <div class="field-row"><label>Ages 13+ spouse income ($)</label><input type="number" id="cpIncome13" value="180000" step="10000"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXPENSES -->
+    <div class="section-open">
+      <div class="section-open-header">Expenses</div>
+      <div class="section-body">
+        <div class="field-row"><label>Base Living Expenses ($)</label><input type="number" id="baseLiving" value="78000"></div>
+        <div class="field-row checkbox-row">
+          <label for="ltcActive">LTC Active</label>
+          <input type="checkbox" id="ltcActive" checked>
+        </div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Each person: onset = their death age − drawn duration</div>
+        <div class="field-row"><label>LTC Duration Mean (yrs)</label><input type="number" id="ltcDurationMean" value="3" step="0.5"></div>
+        <div class="field-row"><label>LTC Duration Std (yrs)</label><input type="number" id="ltcDurationStd" value="2" step="0.5"></div>
+        <div class="field-row"><label>LTC Annual Cost ($)</label><input type="number" id="ltcCost" value="90000"></div>
+        <div class="field-row"><label>LTC Coverage (%)</label><input type="number" id="ltcCoverage" value="50" step="5" min="0" max="100"></div>
+        <div class="field-row"><label>LTC Premium / person ($)</label><input type="number" id="ltcPremium" value="3000" step="500"></div>
+      </div>
+    </div>
+
+    <!-- HOME -->
+    <div class="section-open">
+      <div class="section-open-header">Home</div>
+      <div class="section-body">
+        <div class="field-row"><label>Current Value ($)</label><input type="number" id="homeValue" value="480000"></div>
+        <div class="field-row"><label>Purchase Year</label><input type="number" id="homePurchaseYear" value="2023"></div>
+        <div class="field-row"><label>Original Loan ($)</label><input type="number" id="originalMortgage" value="375000"></div>
+        <div class="field-row"><label>Original Term (yrs)</label><input type="number" id="mortgageYears" value="30"></div>
+        <div class="field-row"><label>Current Mortgage Rate (%)</label><input type="number" id="currentMortgageRate" value="6.75" step="0.05"></div>
+        <div class="field-row"><label>Appreciation Rate (%)</label><input type="number" id="homeApprec" value="3" step="0.1"></div>
+        <div class="field-row"><label>Property Tax Rate (%)</label><input type="number" id="propTaxRate" value="1.0" step="0.1"></div>
+        <div class="field-row"><label>Annual Maintenance ($)</label><input type="number" id="homeRepair" value="10000" step="1000"></div>
+        <div class="field-row"><label>Sell/Move Year (elapsed)</label><input type="number" id="houseSellYear" value="8"></div>
+        <div class="field-row"><label>New Home Value ($)</label><input type="number" id="newHomeValue" value="550000"></div>
+        <div class="field-row"><label>New Mortgage Rate (%)</label><input type="number" id="newMortgageRate" value="6.50" step="0.1"></div>
+      </div>
+    </div>
+
+    <!-- VACATION HOME -->
+    <div class="section-open">
+      <div class="section-open-header">Vacation Home</div>
+      <div class="section-body">
+        <div class="field-row checkbox-row">
+          <label for="vacActive">Active</label>
+          <input type="checkbox" id="vacActive">
+        </div>
+        <div class="field-row"><label>Buy Year (elapsed)</label><input type="number" id="vacBuyYear" value="5"></div>
+        <div class="field-row"><label>Purchase Price ($)</label><input type="number" id="vacPrice" value="600000"></div>
+        <div class="field-row"><label>Down Payment (%)</label><input type="number" id="vacDown" value="20" step="5"></div>
+        <div class="field-row"><label>Mortgage Rate (%)</label><input type="number" id="vacMortgageRate" value="6.75" step="0.05"></div>
+        <div class="field-row"><label>Mortgage Years</label><input type="number" id="vacMortgageYears" value="30"></div>
+        <div class="field-row"><label>Property Tax Rate (%)</label><input type="number" id="vacPropTax" value="1.0" step="0.1"></div>
+        <div class="field-row"><label>Annual Maintenance ($)</label><input type="number" id="vacMaintenance" value="6000" step="1000"></div>
+        <div class="field-row"><label>Annual Rental Income ($)</label><input type="number" id="vacRental" value="0" step="5000"></div>
+        <div class="field-row"><label>Sell Year (0=never)</label><input type="number" id="vacSellYear" value="0"></div>
+        <div class="field-row"><label>Your Ownership (%)</label><input type="number" id="vacOwnership" value="50" step="5" min="1" max="100"></div>
+      </div>
+    </div>
+
+  </div><!-- /expanded-row -->
+
+  <!-- ACCORDION GRID (2 rows × 4 cols) -->
+  <div id="accordion-grid">
+
+    <!-- Timeline -->
+    <details open>
+      <summary>Timeline</summary>
+      <div class="section-body">
+        <div class="field-row"><label>Start Year</label><input type="number" id="startYear" value="2025"></div>
+        <div class="field-row"><label>Start Age</label><input type="number" id="startAge" value="38"></div>
+        <div class="field-row"><label>Retirement Age</label><input type="number" id="retirementAge" value="65"></div>
+        <div class="field-row"><label>Simulations</label><input type="number" id="simCount" value="5000"></div>
+        <div class="field-row"><label>Min Liquid Buffer ($)</label><input type="number" id="minBuffer" value="1000000"></div>
+        <div class="field-row"><label>Plot Percentile</label><input type="number" id="plotPercentile" value="15" step="1" min="1" max="99"></div>
+      </div>
+    </details>
+
+    <!-- Accounts -->
+    <details open>
+      <summary>Accounts</summary>
+      <div class="section-body">
+        <div class="field-row"><label>Brokerage Balance ($)</label><input type="number" id="brokerageBalance" value="100000"></div>
+        <div class="field-row"><label>Brokerage Cost Basis ($)</label><input type="number" id="brokerageBasis" value="50000"></div>
+        <div class="field-row"><label>HSA ($)</label><input type="number" id="hsa" value="18000"></div>
+        <div class="field-row"><label>IRA ($)</label><input type="number" id="ira" value="45000"></div>
+        <div class="field-row"><label>Trad 401k ($)</label><input type="number" id="trad401k" value="220000"></div>
+        <div class="field-row"><label>Roth 401k ($)</label><input type="number" id="roth401k" value="55000"></div>
+      </div>
+    </details>
+
+    <!-- Social Security -->
+    <details open>
+      <summary>Social Security</summary>
+      <div class="section-body">
+        <div class="field-row"><label>SS Start Age</label><input type="number" id="ssStartAge" value="67"></div>
+        <div class="field-row"><label>Primary Benefit ($)</label><input type="number" id="ssPrimary" value="32000"></div>
+        <div class="field-row"><label>Spouse Benefit ($)</label><input type="number" id="ssSpouse" value="16000"></div>
+        <div class="field-row"><label>Haircut Mean (%)</label><input type="number" id="ssHaircut" value="80" step="1"></div>
+        <div class="field-row"><label>Haircut Std (%)</label><input type="number" id="ssHaircutStd" value="15" step="1"></div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">Drawn once per run — models policy/solvency risk</div>
+      </div>
+    </details>
+
+    <!-- Windfalls -->
+    <details open>
+      <summary>Windfalls</summary>
+      <div class="section-body">
+        <div class="field-row"><label>Annual Gift ($)</label><input type="number" id="giftAmount" value="8000"></div>
+        <div class="field-row"><label>Gift Years Remaining</label><input type="number" id="giftYears" value="3"></div>
+        <div class="field-row"><label>Inheritance Amount ($)</label><input type="number" id="inhAmount" value="250000"></div>
+        <div class="field-row"><label>Expected Year</label><input type="number" id="inhYear" value="2048"></div>
+        <div class="field-row"><label>Probability (%)</label><input type="number" id="inhProb" value="40" step="1"></div>
+      </div>
+    </details>
+
+    <!-- Market & Inflation -->
+    <details open>
+      <summary>Market &amp; Inflation</summary>
+      <div class="section-body">
+        <div class="field-row"><label>Inflation Mean (%)</label><input type="number" id="inflMean" value="3" step="0.1"></div>
+        <div class="field-row"><label>Inflation Std (%)</label><input type="number" id="inflStd" value="1.5" step="0.1"></div>
+        <div class="field-row"><label>Stock Mean (%)</label><input type="number" id="stockMean" value="7" step="0.1"></div>
+        <div class="field-row"><label>Stock Std (%)</label><input type="number" id="stockStd" value="16" step="0.1"></div>
+        <div class="field-row"><label>Bond Mean (%)</label><input type="number" id="bondMean" value="4" step="0.1"></div>
+        <div class="field-row"><label>Bond Std (%)</label><input type="number" id="bondStd" value="5" step="0.1"></div>
+        <div class="field-row"><label>Healthcare Inflation (%)</label><input type="number" id="healthInflation" value="5" step="0.1"></div>
+        <div class="field-row checkbox-row">
+          <label for="glidePath">Glide Path (bonds near retirement)</label>
+          <input type="checkbox" id="glidePath" checked>
+        </div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">90% stocks → 50% stocks linearly from age 50–70</div>
+      </div>
+    </details>
+
+    <!-- Guardrails -->
+    <details open>
+      <summary>Guardrails</summary>
+      <div class="section-body">
+        <div class="field-row checkbox-row">
+          <label for="guardrailsActive">Active</label>
+          <input type="checkbox" id="guardrailsActive" checked>
+        </div>
+        <div class="field-row"><label>Lower Threshold ($)</label><input type="number" id="grLower" value="600000"></div>
+        <div class="field-row"><label>Upper Threshold ($)</label><input type="number" id="grUpper" value="4000000"></div>
+        <div class="field-row"><label>Spend Cut (%)</label><input type="number" id="grCut" value="10" step="1"></div>
+        <div class="field-row"><label>Spend Raise (%)</label><input type="number" id="grRaise" value="5" step="1"></div>
+        <div class="field-row"><label>Max Cut (%)</label><input type="number" id="grMaxCut" value="25" step="1"></div>
+        <div class="field-row"><label>Max Raise (%)</label><input type="number" id="grMaxRaise" value="25" step="1"></div>
+      </div>
+    </details>
+
+    <!-- Roth Conversion -->
+    <details open>
+      <summary>Roth Conversion</summary>
+      <div class="section-body">
+        <div class="field-row checkbox-row">
+          <label for="rothActive">Active</label>
+          <input type="checkbox" id="rothActive" checked>
+        </div>
+        <div class="field-row">
+          <label>Target Bracket Top</label>
+          <select id="rothBracket">
+            <option value="0.10">10%</option>
+            <option value="0.12">12%</option>
+            <option value="0.22" selected>22%</option>
+            <option value="0.24">24%</option>
+            <option value="0.32">32%</option>
+          </select>
+        </div>
+        <div class="field-row"><label>Annual Max ($)</label><input type="number" id="rothMax" value="100000"></div>
+      </div>
+    </details>
+
+    <!-- Longevity -->
+    <details open>
+      <summary>Longevity</summary>
+      <div class="section-body">
+        <div class="field-row"><label>Primary Mean Age</label><input type="number" id="lonPrimMean" value="90"></div>
+        <div class="field-row"><label>Primary Std</label><input type="number" id="lonPrimStd" value="9"></div>
+        <div class="field-row"><label>Spouse Mean Age</label><input type="number" id="lonSpMean" value="93"></div>
+        <div class="field-row"><label>Spouse Std</label><input type="number" id="lonSpStd" value="9"></div>
+        <div class="field-row"><label>Min Age</label><input type="number" id="lonMin" value="72"></div>
+        <div class="field-row"><label>Max Age</label><input type="number" id="lonMax" value="110"></div>
+      </div>
+    </details>
+
+  </div><!-- /accordion-grid -->
+
+</div><!-- /content -->
+
+<!-- ==================== SCRIPT ==================== -->
+<script>
+'use strict';
+
+// ---- Spouse UI toggle ----
+document.getElementById('spouseWorks').addEventListener('change', function() {
+  document.getElementById('spouseStopRow').style.display = this.checked ? 'flex' : 'none';
+});
+
+// ---- Care phases: show when children are entered ----
+function updateCarePhasesVisibility() {
+  const hasChildren = document.getElementById('childBirthYears').value.trim().length > 0;
+  document.getElementById('carePhasesSection').style.display = hasChildren ? 'block' : 'none';
+}
+document.getElementById('childBirthYears').addEventListener('input', updateCarePhasesVisibility);
+updateCarePhasesVisibility();
+
+// ---- localStorage persistence for input defaults ----
+// Bumping the version suffix invalidates everyone's saved state — only do that
+// if a field's meaning (not just label) changes incompatibly.
+const STORAGE_KEY = 'retirementPlannerInputs_v1';
+
+function _persistableEls() {
+  return document.querySelectorAll('#content input[id], #content select[id]');
+}
+
+function saveInputs() {
+  const state = {};
+  _persistableEls().forEach(el => {
+    state[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function restoreInputs() {
+  let state;
+  try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) {}
+  if (!state) return;
+  _persistableEls().forEach(el => {
+    if (!(el.id in state)) return;
+    if (el.type === 'checkbox') el.checked = !!state[el.id];
+    else el.value = state[el.id];
+  });
+  document.getElementById('spouseWorks').dispatchEvent(new Event('change'));
+  updateCarePhasesVisibility();
+}
+
+document.getElementById('content').addEventListener('change', saveInputs);
+restoreInputs();
+
+// ---- Utilities ----
+function fmt$(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  return '$' + Math.round(n).toLocaleString();
+}
+
+function randn() {
+  let u, v;
+  do { u = Math.random(); } while (u === 0);
+  do { v = Math.random(); } while (v === 0);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function normalSample(mean, std) { return mean + std * randn(); }
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function percentile(arr, p) {
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (idx - lo) * (sorted[hi] - sorted[lo]);
+}
+
+// ---- Tax Engine ----
+class TaxEngine {
+  constructor() {
+    this.brackets = [
+      [0.10, 23200], [0.12, 94300], [0.22, 201050],
+      [0.24, 383900], [0.32, 487450], [0.37, Infinity]
+    ];
+    this.stdDeduction = 29200;
+    this.ltcg0Limit = 94000;
+  }
+  adjustBrackets(rate) {
+    this.brackets = this.brackets.map(([r, l]) => [r, l === Infinity ? Infinity : l * (1 + rate)]);
+    this.stdDeduction *= (1 + rate);
+    this.ltcg0Limit *= (1 + rate);
+  }
+  calcTax(ordinaryIncome, ltcgIncome) {
+    const taxableOrdinary = Math.max(0, ordinaryIncome - this.stdDeduction);
+    let fedOrdinary = 0, prev = 0;
+    for (const [r, limit] of this.brackets) {
+      if (taxableOrdinary > prev) {
+        fedOrdinary += (Math.min(taxableOrdinary, limit) - prev) * r;
+        prev = limit;
+      } else break;
+    }
+    let fedLtcg = 0;
+    const totalStack = taxableOrdinary + ltcgIncome;
+    if (totalStack > this.ltcg0Limit) {
+      fedLtcg = (totalStack - Math.max(taxableOrdinary, this.ltcg0Limit)) * 0.15;
+    }
+    return fedOrdinary + fedLtcg;
+  }
+}
+
+// ---- SS Taxability ----
+function calcSsTaxable(ordinaryIncome, ss) {
+  const provisional = ordinaryIncome + ss * 0.5;
+  if (provisional <= 32000) return 0;
+  if (provisional <= 44000) return Math.min(0.5 * ss, 0.5 * (provisional - 32000));
+  return Math.min(0.85 * ss, 6000 + 0.85 * (provisional - 44000));
+}
+
+// ---- RMD lookup ----
+const IRS_RMD_TABLE = {73: 26.5, 75: 24.6, 80: 20.2, 85: 16.0, 90: 12.2, 95: 8.9, 100: 6.4};
+function getRmdDivisor(age) {
+  let div = 0;
+  for (const k of Object.keys(IRS_RMD_TABLE).map(Number).sort((a,b)=>a-b)) {
+    if (age >= k) div = IRS_RMD_TABLE[k];
+  }
+  return div;
+}
+
+// ---- Glide path ----
+function stockPct(age, glidePath) {
+  if (!glidePath) return 0.90;
+  if (age < 50) return 0.90;
+  if (age > 70) return 0.50;
+  return 0.90 - 0.40 * (age - 50) / 20;
+}
+
+// CARE_PHASES removed — now passed via cfg.carePhases from UI
+
+// ---- Mortgage payment ----
+function mortgagePayment(principal, annualRate, years) {
+  if (years <= 0 || principal <= 0) return 0;
+  const r = annualRate / 12;
+  const n = years * 12;
+  if (r === 0) return principal / n;
+  return principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+}
+
+// ---- Single simulation run ----
+function runOnce(cfg) {
+  // Draw SS haircut once per run (policy/solvency risk)
+  const ssHaircut = clamp(normalSample(cfg.ssHaircut, cfg.ssHaircutStd), 0, 1);
+
+  // Draw longevity
+  const pLife = Math.round(clamp(normalSample(cfg.lonPrimMean, cfg.lonPrimStd), cfg.lonMin, cfg.lonMax));
+  const sLife = Math.round(clamp(normalSample(cfg.lonSpMean, cfg.lonSpStd), cfg.lonMin, cfg.lonMax));
+  const endAge = Math.max(pLife, sLife);
+
+  // State
+  let hsa     = cfg.hsa;
+  let ira     = cfg.ira;
+  let trad401k = cfg.trad401k;
+  let roth401k = cfg.roth401k;
+  let brokBal  = cfg.brokerageBalance;
+  let brokBasis = cfg.brokerageBasis;
+  let homeVal   = cfg.homeValue;
+  const origR = cfg.mortgageRate / 12;
+  const origN = cfg.mortgageYears * 12;
+  const origPmt = origN > 0 ? cfg.originalMortgage * (origR * Math.pow(1+origR, origN)) / (Math.pow(1+origR, origN) - 1) : 0;
+  const monthsPaid = Math.max(0, (cfg.startYear - cfg.homePurchaseYear) * 12);
+  const initMortgage = monthsPaid >= origN ? 0
+    : Math.max(0, cfg.originalMortgage * Math.pow(1+origR, monthsPaid) - origPmt * (Math.pow(1+origR, monthsPaid) - 1) / origR);
+  let homeMortgage = initMortgage;
+  let homeSold  = false;
+  let mortgageRate = cfg.mortgageRate;
+  let mortgagePmt = origPmt;
+  let vacHomeVal = 0, vacMortgage = 0, vacMortgagePmt = 0, vacActive = false;
+
+  let income = cfg.yourIncome;           // real (today's $)
+  let priceLevel = 1.0;
+  let eduPriceLevel = 1.0;
+  let healthPriceLevel = 1.0;
+  let spendingMult = 1.0;
+
+  const pLtcDur   = cfg.ltcActive ? Math.max(1, Math.round(clamp(normalSample(cfg.ltcDurationMean, cfg.ltcDurationStd), 1, 15))) : 0;
+  const sLtcDur   = cfg.ltcActive ? Math.max(1, Math.round(clamp(normalSample(cfg.ltcDurationMean, cfg.ltcDurationStd), 1, 15))) : 0;
+  const pLtcStart = cfg.ltcActive ? Math.max(70, pLife - pLtcDur) : Infinity;
+  const sLtcStart = cfg.ltcActive ? Math.max(70, sLife - sLtcDur) : Infinity;
+  const firstLtcAge = Math.min(pLtcStart, sLtcStart);
+
+  const taxEngine = new TaxEngine();
+
+  const INITIAL_INCOME = cfg.yourIncome;
+
+  let failed = false, failYear = null;
+  const history = [];
+
+  const childYears = cfg.childBirthYears; // array of birth years
+
+  for (let yr = cfg.startYear; yr <= cfg.startYear + (endAge - cfg.startAge); yr++) {
+    const age = cfg.startAge + (yr - cfg.startYear);
+
+    // --- Inflation ---
+    const annualInfl = Math.max(-0.02, normalSample(cfg.inflMean, cfg.inflStd));
+    priceLevel *= (1 + annualInfl);
+    const eduSpread = 0.02;
+    eduPriceLevel *= (1 + annualInfl + eduSpread);
+    const healthSpread = cfg.healthInflation - cfg.inflMean;
+    healthPriceLevel *= (1 + annualInfl + healthSpread);
+    const infl = priceLevel;
+    const healthInfl = healthPriceLevel;
+    taxEngine.adjustBrackets(annualInfl);
+
+    const isRetired = age >= cfg.retirementAge;
+    const yrsElapsed = yr - cfg.startYear;
+
+    // --- HOUSE EVENT ---
+    if (yrsElapsed === cfg.houseSellYear && !homeSold) {
+      const sellCosts = homeVal * 0.06;
+      const netProceeds = homeVal - homeMortgage - sellCosts;
+      const newP = cfg.newHomeValue * infl;
+      const down = newP * 0.20;
+      const buyCosts = newP * 0.025;
+      const req = down + buyCosts - netProceeds;
+      if (req > 0) {
+        const oldBal = brokBal;
+        brokBal -= req;
+        if (oldBal > 0) brokBasis *= Math.max(0, brokBal / oldBal);
+      } else {
+        brokBal  += Math.abs(req);
+        brokBasis += Math.abs(req);
+      }
+      homeVal = newP;
+      homeMortgage = newP - down;
+      mortgageRate = cfg.newMortgageRate;
+      mortgagePmt = mortgagePayment(homeMortgage, mortgageRate, 30);
+    }
+
+    // --- LTC home sale ---
+    if (cfg.ltcActive && age === firstLtcAge && !homeSold && homeVal > 0) {
+      const sellCosts = homeVal * 0.06;
+      const netProceeds = Math.max(0, homeVal - homeMortgage - sellCosts);
+      brokBal   += netProceeds;
+      brokBasis += netProceeds;
+      homeVal = 0; homeMortgage = 0; mortgagePmt = 0;
+      homeSold = true;
+    }
+
+    // --- VACATION HOME BUY / SELL ---
+    if (cfg.vacActive && yrsElapsed === cfg.vacBuyYear && !vacActive) {
+      const price = cfg.vacPrice * infl;
+      const own = cfg.vacOwnership / 100;
+      const loan = (price - price * cfg.vacDown / 100) * own;
+      const oldBal = brokBal;
+      brokBal -= (price * cfg.vacDown / 100 * own + price * 0.025 * own);
+      if (oldBal > 0) brokBasis *= Math.max(0, brokBal / oldBal);
+      vacHomeVal = price;
+      vacMortgage = loan;
+      vacMortgagePmt = mortgagePayment(loan, cfg.vacMortgageRate, cfg.vacMortgageYears);
+      vacActive = true;
+    }
+    if (cfg.vacActive && cfg.vacSellYear > 0 && yrsElapsed === cfg.vacSellYear && vacActive) {
+      const net = Math.max(0, vacHomeVal * (cfg.vacOwnership / 100) * (1 - 0.06) - vacMortgage);
+      brokBal += net; brokBasis += net;
+      vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
+    }
+
+    // --- WINDFALLS ---
+    if (yrsElapsed < cfg.giftYears) {
+      const amt = cfg.giftAmount * infl;
+      brokBal   += amt;
+      brokBasis += amt;
+    }
+    if (yr === cfg.inhYear && Math.random() < cfg.inhProb) {
+      const amt = cfg.inhAmount * infl;
+      brokBal   += amt;
+      brokBasis += amt;
+    }
+
+    // --- INCOME ---
+    let wage = 0;
+    let incomeReduc = false;
+    let spouseWorking = false;
+    let spouseWage = 0;
+
+    if (!isRetired) {
+      // Spouse working logic
+      if (cfg.spouseWorks) {
+        const stopYr = cfg.spouseStopYear === 0 ? null : cfg.spouseStopYear;
+        spouseWorking = stopYr === null || yr < stopYr;
+      } else {
+        spouseWorking = false;
+      }
+      if (!spouseWorking) {
+        incomeReduc = true;
+      } else {
+        let spousePhaseIncome = cfg.spouseIncome; // default: full income
+        for (const bYr of childYears) {
+          const kAge = yr - bYr;
+          for (const ph of cfg.carePhases) {
+            if (kAge >= ph.start && kAge <= ph.end) {
+              spousePhaseIncome = Math.min(spousePhaseIncome, ph.spouseIncome);
+            }
+          }
+        }
+        spouseWage = spousePhaseIncome * infl;
+        incomeReduc = spouseWage < cfg.spouseIncome * infl;
+      }
+
+      wage = income * infl + spouseWage;
+
+      // Stochastic real income growth
+      const realGrowth = normalSample(cfg.rgMean, cfg.rgStd);
+      income = Math.max(income * (1 + realGrowth), INITIAL_INCOME * cfg.incomeFloor);
+    }
+
+    // Social Security
+    const ss = age >= cfg.ssStartAge
+      ? (cfg.ssPrimary + cfg.ssSpouse) * infl * ssHaircut
+      : 0;
+
+    // --- EXPENSES ---
+    let living = cfg.baseLiving * infl * spendingMult;
+    if (isRetired) {
+      const rm = age <= 75 ? 1.10 : (age <= 85 ? 0.95 : 0.90);
+      living *= rm;
+    }
+
+    let kidsCost = 0;
+    for (const bYr of childYears) {
+      const kAge = yr - bYr;
+      if (kAge >= 0 && kAge <= 18) kidsCost += 12000 * infl;
+      if (kAge >= 0 && kAge <= 5 && !incomeReduc) kidsCost += 30000 * infl;
+      else if (kAge >= 6 && kAge <= 17) kidsCost += 8000 * infl;
+      else if (kAge >= 18 && kAge <= 21) kidsCost += 35000 * eduPriceLevel;
+    }
+
+    const ltcCount = cfg.ltcActive
+      ? (age >= pLtcStart && age < pLife ? 1 : 0) + (age >= sLtcStart && age < sLife ? 1 : 0)
+      : 0;
+    const ltcPremiumCount = cfg.ltcActive
+      ? (age < pLtcStart && age < pLife ? 1 : 0) + (age < sLtcStart && age < sLife ? 1 : 0)
+      : 0;
+    const health = isRetired
+      ? (12000 * healthInfl + ltcCount * cfg.ltcCost * (1 - cfg.ltcCoverage) * healthInfl)
+      : 0;
+    const ltcPremiums = ltcPremiumCount * cfg.ltcPremium * healthInfl;
+
+    const carCost = yrsElapsed > 0 && yrsElapsed % 8 === 0 ? 30000 * infl : 0;
+    const repairCost = !homeSold && homeVal > 0 ? cfg.homeRepair * infl : 0;
+    const propTax    = homeVal > 0 ? cfg.propTaxRate * homeVal : 0;
+
+    let mortPay = 0;
+    if (homeMortgage > 0) {
+      const annPmt = mortgagePmt * 12;
+      const interest = homeMortgage * mortgageRate;
+      const princ = annPmt - interest;
+      if (homeMortgage < princ) {
+        mortPay = homeMortgage + interest;
+        homeMortgage = 0;
+      } else {
+        mortPay = annPmt;
+        homeMortgage -= princ;
+      }
+    }
+
+    let vacCost = 0;
+    if (vacActive) {
+      let vacMortPay = 0;
+      if (vacMortgage > 0) {
+        const annPmt = vacMortgagePmt * 12;
+        const interest = vacMortgage * cfg.vacMortgageRate;
+        const princ = annPmt - interest;
+        if (vacMortgage < princ) { vacMortPay = vacMortgage + interest; vacMortgage = 0; }
+        else { vacMortPay = annPmt; vacMortgage -= princ; }
+      }
+      const own = cfg.vacOwnership / 100;
+      vacCost = vacMortPay + (cfg.vacPropTax / 100) * vacHomeVal * own + cfg.vacMaintenance * infl * own - cfg.vacRental * infl * own;
+    }
+    const totalExp = living + kidsCost + health + ltcPremiums + mortPay + propTax + carCost + repairCost + vacCost;
+
+    // --- MARKET RETURNS ---
+    const sp = stockPct(age, cfg.glidePath);
+    const mkt = sp * normalSample(cfg.stockMean, cfg.stockStd)
+              + (1 - sp) * normalSample(cfg.bondMean, cfg.bondStd)
+              - 0.0015;
+    hsa      *= (1 + mkt);
+    ira      *= (1 + mkt);
+    trad401k *= (1 + mkt);
+    roth401k *= (1 + mkt);
+    brokBal  *= (1 + mkt);
+    homeVal  *= (1 + cfg.homeApprec);
+    if (vacActive) vacHomeVal *= (1 + cfg.homeApprec);
+
+    // --- TAX & FLOW ---
+    if (!isRetired) {
+      // Catch-up limits
+      const catchup401k = (age >= 60 && age <= 63) ? 11250 : (age >= 50 ? 7500 : 0);
+      const catchupHsa  = age >= 55 ? 1000 : 0;
+      const catchupIra  = age >= 50 ? 1000 : 0;
+
+      const employedAdults = spouseWorking ? 2 : 1;
+      const pretax401k = Math.min(wage, (23000 + catchup401k) * infl * employedAdults);
+      const pretaxHsa  = Math.min(Math.max(0, wage - pretax401k), (8300 + catchupHsa) * infl);
+      const taxableWage = wage - pretax401k - pretaxHsa;
+
+      const tax = taxEngine.calcTax(taxableWage, 0);
+
+      // FICA
+      const ssWageBase = 168600 * infl;
+      const primaryGross = income * infl;
+      let fica = 0.062 * Math.min(primaryGross, ssWageBase) + 0.0145 * primaryGross;
+      if (spouseWorking) {
+        fica += 0.062 * Math.min(spouseWage, ssWageBase) + 0.0145 * spouseWage;
+      }
+      const combinedGross = primaryGross + (spouseWorking ? spouseWage : 0);
+      fica += 0.009 * Math.max(0, combinedGross - 250000);
+
+      const net = (taxableWage - tax - fica) - totalExp;
+
+      trad401k += pretax401k;
+      hsa      += pretaxHsa;
+
+      if (net > 0) {
+        let avail = net;
+        const iraSave = Math.min(avail, (7000 + catchupIra) * infl * 2);
+        ira    += iraSave;
+        avail  -= iraSave;
+        brokBal   += avail;
+        brokBasis += avail;
+      } else {
+        let needed = Math.abs(net);
+        if (brokBal >= needed) {
+          brokBal -= needed;
+          needed = 0;
+        } else {
+          needed -= Math.max(0, brokBal);
+          brokBal = 0;
+          // Roth
+          if (roth401k > 0 && needed > 0) {
+            const pull = Math.min(roth401k, needed);
+            roth401k = Math.max(0, roth401k - pull);
+            needed   -= pull;
+          }
+          // Traditional
+          if (needed > 0) {
+            const penalty = age < 59.5 ? 0.10 : 0;
+            const grossEst = needed * 1.5;
+            const availTrad = trad401k + ira;
+            const pull = Math.min(availTrad, grossEst);
+            if (trad401k >= pull) {
+              trad401k = Math.max(0, trad401k - pull);
+            } else {
+              const rem = pull - trad401k;
+              trad401k = 0;
+              ira = Math.max(0, ira - rem);
+            }
+          }
+        }
+      }
+    } else {
+      // RETIREMENT WITHDRAWAL ENGINE
+
+      // RMD
+      let rmd = 0;
+      const div = getRmdDivisor(age);
+      if (div > 0) {
+        const tradBal0 = trad401k + ira;
+        rmd = tradBal0 / div;
+        const prop = tradBal0 > 0 ? trad401k / tradBal0 : 0;
+        trad401k = Math.max(0, trad401k - rmd * prop);
+        ira      = Math.max(0, ira      - rmd * (1 - prop));
+      }
+
+      // Roth conversion
+      let rothConv = 0;
+      if (cfg.rothActive) {
+        const tradBal = trad401k + ira;
+        if (tradBal > 0) {
+          // Find limit of bracket just above targetBracketTop
+          let targetLimit = Infinity;
+          for (const [r, l] of taxEngine.brackets) {
+            if (r > cfg.rothBracket) { targetLimit = l; break; }
+          }
+          const taxableRmd = Math.max(0, rmd - taxEngine.stdDeduction);
+          const bracketSpace = Math.max(0, targetLimit - taxableRmd);
+          rothConv = Math.min(tradBal, bracketSpace, cfg.rothMax * infl);
+          if (rothConv > 0) {
+            const prop = tradBal > 0 ? trad401k / tradBal : 0;
+            trad401k = Math.max(0, trad401k - rothConv * prop);
+            ira      = Math.max(0, ira      - rothConv * (1 - prop));
+            roth401k += rothConv;
+          }
+        }
+      }
+
+      const ssTaxable = calcSsTaxable(rmd + rothConv, ss);
+      const ordinaryBase = rmd + rothConv + ssTaxable;
+      const combinedTax = taxEngine.calcTax(ordinaryBase, 0);
+
+      const netIncome = rmd + ss - combinedTax;
+      let needed = totalExp - netIncome;
+
+      if (needed <= 0) {
+        brokBal   += Math.abs(needed);
+        brokBasis += Math.abs(needed);
+        needed = 0;
+      }
+
+      // 1. Brokerage (LTCG)
+      if (needed > 0 && brokBal > 0) {
+        const gainPct = Math.max(0, brokBal > 0 ? (brokBal - brokBasis) / brokBal : 0);
+        const grossFactor = 1 / Math.max(0.5, 1 - gainPct * 0.15);
+        const pull = Math.min(brokBal, needed * grossFactor);
+        const ltcgIncome = pull * gainPct;
+        const marginalLtcgTax = taxEngine.calcTax(ordinaryBase, ltcgIncome)
+                              - taxEngine.calcTax(ordinaryBase, 0);
+        const niit = 0.038 * Math.min(ltcgIncome, Math.max(0, ordinaryBase + ltcgIncome - 250000));
+        const netPull = pull - marginalLtcgTax - niit;
+        const oldBal = brokBal;
+        brokBal = Math.max(0, brokBal - pull);
+        brokBasis = oldBal > 0 ? Math.max(0, brokBasis * (brokBal / oldBal)) : 0;
+        needed = Math.max(0, needed - netPull);
+      }
+
+      // 2. Roth 401k / HSA (tax-free)
+      if (needed > 0) {
+        const avail = roth401k + hsa;
+        const pull = Math.min(avail, needed);
+        if (roth401k >= pull) {
+          roth401k = Math.max(0, roth401k - pull);
+        } else {
+          const rem = pull - roth401k;
+          roth401k = 0;
+          hsa = Math.max(0, hsa - rem);
+        }
+        needed -= pull;
+      }
+
+      // 3. Traditional (taxable)
+      if (needed > 0) {
+        const availTrad = trad401k + ira;
+        const penalty = age < 59.5 ? 0.10 : 0;
+        const grossEst = needed * 1.5;
+        const pull = Math.min(availTrad, grossEst);
+        if (pull > 0) {
+          const marginalTax = taxEngine.calcTax(ordinaryBase + pull, 0)
+                            - taxEngine.calcTax(ordinaryBase, 0);
+          const netRes = pull - marginalTax - pull * penalty;
+          if (trad401k >= pull) {
+            trad401k = Math.max(0, trad401k - pull);
+          } else {
+            const rem = pull - trad401k;
+            trad401k = 0;
+            ira = Math.max(0, ira - rem);
+          }
+          needed = Math.max(0, needed - netRes);
+        }
+      }
+
+    }
+
+    // POST-YEAR
+    let liq = hsa + ira + trad401k + roth401k + brokBal;
+
+    // Guardrails
+    if (isRetired && cfg.guardrailsActive) {
+      if (liq < cfg.grLower * infl) {
+        spendingMult = Math.max(1 - cfg.grMaxCut, spendingMult * (1 - cfg.grCut));
+      } else if (liq > cfg.grUpper * infl) {
+        spendingMult = Math.min(1 + cfg.grMaxRaise, spendingMult * (1 + cfg.grRaise));
+      }
+    }
+
+    // Failure check — sell vacation home as last resort before declaring failure
+    if (liq < cfg.minBuffer && !failed) {
+      if (vacActive) {
+        const net = Math.max(0, vacHomeVal * (cfg.vacOwnership / 100) * (1 - 0.06) - vacMortgage);
+        brokBal += net; brokBasis += net; liq += net;
+        vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
+      }
+      if (liq < cfg.minBuffer) {
+        failed = true;
+        failYear = yr;
+      }
+    }
+
+    // Zero out all wealth permanently on failure
+    if (failed) {
+      hsa = 0; ira = 0; trad401k = 0; roth401k = 0;
+      brokBal = 0; brokBasis = 0;
+      homeVal = 0; homeMortgage = 0; mortgagePmt = 0;
+      vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
+      liq = 0;
+    }
+
+    history.push({
+      year: yr, age,
+      liquidAssets: Math.max(0, liq),
+      brokerage:  Math.max(0, brokBal),
+      hsa:        Math.max(0, hsa),
+      ira:        Math.max(0, ira),
+      trad401k:   Math.max(0, trad401k),
+      roth401k:   Math.max(0, roth401k),
+      expLiving:  living,
+      expHome:    mortPay + propTax,
+      expKids:    kidsCost,
+      expHealth:  health,
+      expCar:     carCost,
+      expRepair:  repairCost,
+      ssIncome:   ss,
+      wageIncome: wage,
+    });
+  }
+
+  return { failed, failYear, history };
+}
+
+// ---- Monte Carlo runner ----
+async function runMonteCarlo(cfg, onProgress) {
+  const n = cfg.simCount;
+  const allRuns = [];
+  let fails = 0;
+  const failYears = [];
+
+  for (let i = 0; i < n; i++) {
+    const result = runOnce(cfg);
+    allRuns.push(result);
+    if (result.failed) {
+      fails++;
+      if (result.failYear !== null) failYears.push(result.failYear);
+    }
+    if (i % 200 === 0) {
+      onProgress(i / n);
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+  onProgress(1);
+  return { allRuns, fails, failYears };
+}
+
+// ---- Result processing ----
+function processResults(allRuns) {
+  const finals = allRuns.map(r => r.history[r.history.length - 1]?.liquidAssets ?? 0);
+  const medianLegacy = percentile(finals, 50);
+  return { medianLegacy };
+}
+
+// ---- Read config from UI ----
+function readConfig() {
+  const v = id => parseFloat(document.getElementById(id).value) || 0;
+  const vi = id => parseInt(document.getElementById(id).value) || 0;
+  const vb = id => document.getElementById(id).checked;
+  const vs = id => document.getElementById(id).value;
+
+  const childText = vs('childBirthYears').trim();
+  const childBirthYears = childText
+    ? childText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+    : [];
+  const carePhases = [
+    { start: 0,  end: 5,  spouseIncome: v('cpIncome0')  },
+    { start: 6,  end: 12, spouseIncome: v('cpIncome6')  },
+    { start: 13, end: 99, spouseIncome: v('cpIncome13') },
+  ];
+
+  const spouseWorks = vb('spouseWorks');
+  let spouseStopYear = 0;
+  if (spouseWorks) {
+    spouseStopYear = vi('spouseStopYear');
+  }
+
+  return {
+    startYear:       vi('startYear'),
+    startAge:        vi('startAge'),
+    retirementAge:   vi('retirementAge'),
+    simCount:        Math.max(100, vi('simCount')),
+    minBuffer:       v('minBuffer'),
+
+    brokerageBalance: v('brokerageBalance'),
+    brokerageBasis:   v('brokerageBasis'),
+    hsa:              v('hsa'),
+    ira:              v('ira'),
+    trad401k:         v('trad401k'),
+    roth401k:         v('roth401k'),
+
+    yourIncome:   v('yourIncome'),
+    rgMean:       v('rgMean') / 100,
+    rgStd:        v('rgStd') / 100,
+    incomeFloor:  v('incomeFloor') / 100,
+
+    ssStartAge:   vi('ssStartAge'),
+    ssPrimary:    v('ssPrimary'),
+    ssSpouse:     v('ssSpouse'),
+    ssHaircut:    v('ssHaircut') / 100,
+    ssHaircutStd: v('ssHaircutStd') / 100,
+
+    spouseIncome:    v('spouseIncome'),
+    spouseWorks,
+    spouseStopYear,
+
+    childBirthYears,
+    carePhases,
+
+    baseLiving:   v('baseLiving'),
+    ltcActive:    vb('ltcActive'),
+    ltcDurationMean: v('ltcDurationMean'),
+    ltcDurationStd:  v('ltcDurationStd'),
+    ltcCost:      v('ltcCost'),
+    ltcCoverage:  v('ltcCoverage') / 100,
+    ltcPremium:   v('ltcPremium'),
+
+    homeValue:        v('homeValue'),
+    homePurchaseYear: vi('homePurchaseYear'),
+    originalMortgage: v('originalMortgage'),
+    mortgageYears:    vi('mortgageYears'),
+    mortgageRate:     v('currentMortgageRate') / 100,
+    homeApprec:      v('homeApprec') / 100,
+    propTaxRate:     v('propTaxRate') / 100,
+    homeRepair:      v('homeRepair'),
+    houseSellYear:   vi('houseSellYear'),
+    newHomeValue:    v('newHomeValue'),
+    newMortgageRate: v('newMortgageRate') / 100,
+
+    vacActive:        vb('vacActive'),
+    vacBuyYear:       vi('vacBuyYear'),
+    vacPrice:         v('vacPrice'),
+    vacDown:          v('vacDown'),
+    vacMortgageRate:  v('vacMortgageRate') / 100,
+    vacMortgageYears: vi('vacMortgageYears'),
+    vacPropTax:       v('vacPropTax'),
+    vacMaintenance:   v('vacMaintenance'),
+    vacRental:        v('vacRental'),
+    vacSellYear:      vi('vacSellYear'),
+    vacOwnership:     v('vacOwnership'),
+
+    giftAmount: v('giftAmount'),
+    giftYears:  vi('giftYears'),
+    inhAmount:  v('inhAmount'),
+    inhYear:    vi('inhYear'),
+    inhProb:    v('inhProb') / 100,
+
+    inflMean:  v('inflMean') / 100,
+    inflStd:   v('inflStd') / 100,
+    healthInflation: v('healthInflation') / 100,
+    stockMean: v('stockMean') / 100,
+    stockStd:  v('stockStd') / 100,
+    bondMean:  v('bondMean') / 100,
+    bondStd:   v('bondStd') / 100,
+
+    glidePath:        vb('glidePath'),
+    guardrailsActive: vb('guardrailsActive'),
+    grLower:    v('grLower'),
+    grUpper:    v('grUpper'),
+    grCut:      v('grCut') / 100,
+    grRaise:    v('grRaise') / 100,
+    grMaxCut:   v('grMaxCut') / 100,
+    grMaxRaise: v('grMaxRaise') / 100,
+
+    rothActive:  vb('rothActive'),
+    rothBracket: parseFloat(vs('rothBracket')),
+    rothMax:     v('rothMax'),
+
+    lonPrimMean: v('lonPrimMean'),
+    lonPrimStd:  v('lonPrimStd'),
+    lonSpMean:   v('lonSpMean'),
+    lonSpStd:    v('lonSpStd'),
+    lonMin:      vi('lonMin'),
+    lonMax:      vi('lonMax'),
+    plotPercentile: vi('plotPercentile') || 15,
+  };
+}
+
+// ---- Main entry ----
+async function startSimulation() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+
+  const prog = document.getElementById('progressWrap');
+  const progBar = document.getElementById('progressBar');
+  const progLabel = document.getElementById('progressLabel');
+  prog.style.display = 'block';
+  progLabel.style.display = 'block';
+  progBar.style.width = '0%';
+
+  const cfg = readConfig();
+
+  const { allRuns, fails, failYears } = await runMonteCarlo(cfg, pct => {
+    const p = Math.round(pct * 100);
+    progBar.style.width = p + '%';
+    progLabel.textContent = `Running simulations… ${p}%`;
+    btn.textContent = p < 100 ? `Running… ${p}%` : 'Running…';
+  });
+
+  const proc = processResults(allRuns);
+  const successRate = 100 * (1 - fails / cfg.simCount);
+  document.getElementById('metricSuccess').textContent = successRate.toFixed(1) + '%';
+
+  prog.style.display = 'none';
+  progLabel.style.display = 'none';
+  btn.disabled = false;
+  btn.textContent = 'Run Simulation';
+}
+</script>
+</body>
+</html>
