@@ -7,13 +7,21 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { height: 100%; overflow: hidden; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: #1e2130;
   color: #cdd3e0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  /* position:fixed pins the body to the viewport so iOS Safari can't
+     scroll the whole document when the on-screen keyboard opens. The
+     internal scrolling happens inside #content. Without this the
+     topbar would end up partially under the Dynamic Island after the
+     number pad closes. */
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
   overflow: hidden;
 }
 
