@@ -228,6 +228,52 @@ body {
 }
 .field-row.checkbox-row label { cursor: pointer; color: #aab5cc; }
 
+/* ---- EXPENSES MODE TOGGLE ---- */
+.exp-mode-toggle {
+  display: flex;
+  gap: 4px;
+  background: #232742;
+  border: 1px solid #3a4060;
+  border-radius: 6px;
+  padding: 2px;
+  margin-bottom: 8px;
+}
+.exp-mode-toggle label {
+  flex: 1;
+  text-align: center;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #8a95b0;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+.exp-mode-toggle label.active {
+  background: #3d5ede;
+  color: #fff;
+}
+.exp-mode-toggle input[type="radio"] { display: none; }
+.exp-subhead {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #7a85a0;
+  margin: 10px 0 5px;
+}
+.exp-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #2d3350;
+  font-size: 12px;
+}
+.exp-total-row .label { color: #8a95b0; }
+.exp-total-row .value { font-weight: 700; color: #cdd3e0; }
+
 /* ---- ACCORDION GRID ---- */
 #accordion-grid {
   display: grid;
@@ -278,6 +324,9 @@ body {
   #accordion-grid details summary { font-size: 12px; padding: 10px 14px; }
   #about-section > summary { font-size: 12px; padding: 12px 16px; }
   .about-body { font-size: 14px; padding: 14px 18px 16px; }
+  .exp-mode-toggle label { font-size: 14px; padding: 9px 10px; }
+  .exp-subhead { font-size: 12px; }
+  .exp-total-row { font-size: 15px; }
 }
 
 #accordion-grid details summary {
@@ -401,7 +450,35 @@ body {
     <div class="section-open">
       <div class="section-open-header">Expenses</div>
       <div class="section-body">
-        <div class="field-row"><label>Base Living Expenses ($)</label><input type="number" id="baseLiving" value="78000"></div>
+        <div class="exp-mode-toggle">
+          <label><input type="radio" name="expMode" id="expModeTotal" value="total" checked><span>Annual total</span></label>
+          <label><input type="radio" name="expMode" id="expModeCategory" value="category"><span>By category</span></label>
+        </div>
+
+        <div id="expTotalSection">
+          <div class="field-row"><label>Base Living Expenses ($)</label><input type="number" id="baseLiving" value="78000"></div>
+        </div>
+
+        <div id="expCategorySection" style="display:none;">
+          <div class="exp-subhead">Monthly</div>
+          <div class="field-row"><label>Groceries ($/mo)</label><input type="number" id="expGroceries" value="1200"></div>
+          <div class="field-row"><label>Dining Out ($/mo)</label><input type="number" id="expDining" value="600"></div>
+          <div class="field-row"><label>Utilities ($/mo)</label><input type="number" id="expUtilities" value="400"></div>
+          <div class="field-row"><label>Transportation ($/mo)</label><input type="number" id="expTransport" value="500"></div>
+          <div class="field-row"><label>Subscriptions ($/mo)</label><input type="number" id="expSubscriptions" value="200"></div>
+          <div class="field-row"><label>Personal &amp; Household ($/mo)</label><input type="number" id="expPersonal" value="700"></div>
+          <div class="field-row"><label>Other Monthly ($/mo)</label><input type="number" id="expOtherMonthly" value="500"></div>
+
+          <div class="exp-subhead">Annual (non-monthly)</div>
+          <div class="field-row"><label>Travel ($/yr)</label><input type="number" id="expTravel" value="10000"></div>
+          <div class="field-row"><label>Gifts &amp; Charity ($/yr)</label><input type="number" id="expGiftsCharity" value="4000"></div>
+          <div class="field-row"><label>Other Annual ($/yr)</label><input type="number" id="expOtherAnnual" value="4000"></div>
+
+          <div class="exp-total-row">
+            <span class="label">Annual total</span>
+            <span class="value" id="expCategoryTotal">—</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -602,6 +679,43 @@ document.getElementById('moveToNewHome').addEventListener('change', function() {
   document.getElementById('moveDetails').style.display = this.checked ? 'block' : 'none';
 });
 
+// ---- Expense input mode toggle (annual total / by category) ----
+const EXP_MONTHLY_IDS = ['expGroceries', 'expDining', 'expUtilities', 'expTransport',
+                         'expSubscriptions', 'expPersonal', 'expOtherMonthly'];
+const EXP_ANNUAL_IDS  = ['expTravel', 'expGiftsCharity', 'expOtherAnnual'];
+
+function _stripCommas(v) { return parseFloat(String(v).replace(/,/g, '')) || 0; }
+
+function expCategoryAnnualTotal() {
+  const monthly = EXP_MONTHLY_IDS.reduce((s, id) => s + _stripCommas(document.getElementById(id).value), 0);
+  const annual  = EXP_ANNUAL_IDS .reduce((s, id) => s + _stripCommas(document.getElementById(id).value), 0);
+  return monthly * 12 + annual;
+}
+
+function updateCategoryTotalLabel() {
+  document.getElementById('expCategoryTotal').textContent =
+    '$' + expCategoryAnnualTotal().toLocaleString('en-US');
+}
+
+function updateExpenseModeUI() {
+  const cat = document.getElementById('expModeCategory').checked;
+  document.getElementById('expTotalSection').style.display    = cat ? 'none'  : 'block';
+  document.getElementById('expCategorySection').style.display = cat ? 'block' : 'none';
+  // Reflect the selected mode in the toggle's button styling
+  document.querySelectorAll('.exp-mode-toggle label').forEach(lbl => {
+    const radio = lbl.querySelector('input[type="radio"]');
+    lbl.classList.toggle('active', radio && radio.checked);
+  });
+  if (cat) updateCategoryTotalLabel();
+}
+
+document.getElementById('expModeTotal').addEventListener('change', updateExpenseModeUI);
+document.getElementById('expModeCategory').addEventListener('change', updateExpenseModeUI);
+// Recompute the running total when any category input changes
+[...EXP_MONTHLY_IDS, ...EXP_ANNUAL_IDS].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateCategoryTotalLabel);
+});
+
 // ---- Care phases: show when children are entered ----
 function updateCarePhasesVisibility() {
   const hasChildren = document.getElementById('childBirthYears').value.trim().length > 0;
@@ -618,6 +732,9 @@ const COMMA_FORMATTED_IDS = new Set([
   'minBuffer', 'simCount',
   'yourIncome', 'spouseIncome', 'cpIncome0', 'cpIncome6', 'cpIncome13',
   'baseLiving', 'ltcCost', 'ltcPremium',
+  'expGroceries', 'expDining', 'expUtilities', 'expTransport',
+  'expSubscriptions', 'expPersonal', 'expOtherMonthly',
+  'expTravel', 'expGiftsCharity', 'expOtherAnnual',
   'brokerageBalance', 'brokerageBasis', 'hsa', 'ira', 'trad401k', 'roth401k',
   'homeValue', 'originalMortgage', 'homeRepair', 'newHomeValue',
   'vacPrice', 'vacMaintenance', 'vacRental',
@@ -673,7 +790,8 @@ function _persistableEls() {
 function saveInputs() {
   const state = {};
   _persistableEls().forEach(el => {
-    state[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+    if (el.type === 'checkbox' || el.type === 'radio') state[el.id] = el.checked;
+    else state[el.id] = el.value;
   });
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
 }
@@ -684,7 +802,7 @@ function restoreInputs() {
   if (!state) return;
   _persistableEls().forEach(el => {
     if (!(el.id in state)) return;
-    if (el.type === 'checkbox') el.checked = !!state[el.id];
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = !!state[el.id];
     else el.value = state[el.id];
   });
 }
@@ -707,6 +825,7 @@ COMMA_FORMATTED_IDS.forEach(id => {
 document.getElementById('spouseWorks').dispatchEvent(new Event('change'));
 document.getElementById('vacActive').dispatchEvent(new Event('change'));
 document.getElementById('moveToNewHome').dispatchEvent(new Event('change'));
+updateExpenseModeUI();
 updateCarePhasesVisibility();
 
 // ---- Utilities ----
@@ -1361,7 +1480,9 @@ function readConfig() {
     childBirthYears,
     carePhases,
 
-    baseLiving:   v('baseLiving'),
+    baseLiving:   document.getElementById('expModeCategory').checked
+                    ? expCategoryAnnualTotal()
+                    : v('baseLiving'),
     ltcActive:    vb('ltcActive'),
     ltcDurationMean: v('ltcDurationMean'),
     ltcDurationStd:  v('ltcDurationStd'),
