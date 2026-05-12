@@ -287,32 +287,31 @@ body {
 .exp-total-row .label { color: #8a95b0; }
 .exp-total-row .value { font-weight: 700; color: #cdd3e0; }
 
-/* ---- ACCORDION GRID ---- */
+/* ---- LOWER SECTION GRID ---- */
 #accordion-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   flex: 1;
 }
 
-#accordion-grid details {
+#accordion-grid .section-open {
   border-right: 1px solid #2d3350;
   border-bottom: 1px solid #2d3350;
 }
-#accordion-grid details:nth-child(4n) { border-right: none; }
+#accordion-grid .section-open:nth-child(4n) { border-right: none; }
 
 /* ---- RESPONSIVE BREAKPOINTS ---- */
 @media (max-width: 1100px) {
   #expanded-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #accordion-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #accordion-grid details:nth-child(4n) { border-right: 1px solid #2d3350; }
-  #accordion-grid details:nth-child(2n) { border-right: none; }
+  #accordion-grid .section-open:nth-child(4n) { border-right: 1px solid #2d3350; }
+  #accordion-grid .section-open:nth-child(2n) { border-right: none; }
 }
 @media (max-width: 680px) {
   #expanded-row { grid-template-columns: 1fr; }
   .section-open { border-right: none; }
   #accordion-grid { grid-template-columns: 1fr; }
-  #accordion-grid details:nth-child(2n) { border-right: none; }
-  #accordion-grid details { border-right: none; }
+  #accordion-grid .section-open { border-right: none; }
 
   /* Uniform two-column grid: label fills remaining width, input is a
      fixed narrower column so every row lines up identically. 16px on
@@ -334,7 +333,6 @@ body {
   }
   .field-row input[type="checkbox"] { width: 18px; height: 18px; justify-self: start; }
   .section-open-header { font-size: 12px; padding: 10px 14px; }
-  #accordion-grid details summary { font-size: 12px; padding: 10px 14px; }
   #about-section > summary { font-size: 12px; padding: 12px 16px; }
   .about-body { font-size: 14px; padding: 14px 18px 16px; }
   .about-reset-btn { font-size: 13px; padding: 9px 18px; }
@@ -343,30 +341,6 @@ body {
   .exp-total-row { font-size: 15px; }
 }
 
-#accordion-grid details summary {
-  padding: 8px 14px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: #8a95b0;
-  cursor: pointer;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  list-style: none;
-  background: #191d2e;
-}
-#accordion-grid details summary::-webkit-details-marker { display: none; }
-#accordion-grid details summary::before {
-  content: '▶';
-  font-size: 9px;
-  transition: transform 0.15s;
-  color: #5a6480;
-}
-#accordion-grid details[open] summary::before { transform: rotate(90deg); }
-#accordion-grid details summary:hover { background: #222640; color: #b0bcd0; }
 </style>
 </head>
 <body>
@@ -414,11 +388,11 @@ body {
     <div class="section-open">
       <div class="section-open-header">Timeline</div>
       <div class="section-body">
-        <div class="field-row"><label>Start Year</label><input type="number" id="startYear" value="2025"></div>
+        <div class="field-row"><label>Start Year</label><input type="number" id="startYear" value="2026"></div>
         <div class="field-row"><label>Start Age</label><input type="number" id="startAge" value="38"></div>
         <div class="field-row"><label>Retirement Age</label><input type="number" id="retirementAge" value="65"></div>
         <div class="field-row"><label>Simulations</label><input type="number" id="simCount" value="5000"></div>
-        <div class="field-row"><label>Min Liquid Buffer ($)</label><input type="number" id="minBuffer" value="1000000"></div>
+        <div class="field-row"><label>Min Liquid Buffer ($)</label><input type="number" id="minBuffer" value="500000"></div>
       </div>
     </div>
 
@@ -560,20 +534,20 @@ body {
   <div id="accordion-grid">
 
     <!-- Windfalls -->
-    <details open>
-      <summary>Windfalls</summary>
+    <div class="section-open">
+      <div class="section-open-header">Windfalls</div>
       <div class="section-body">
         <div class="field-row"><label>Annual Gift ($)</label><input type="number" id="giftAmount" value="8000"></div>
         <div class="field-row"><label>Gift Years Remaining</label><input type="number" id="giftYears" value="3"></div>
         <div class="field-row"><label>Inheritance Amount ($)</label><input type="number" id="inhAmount" value="250000"></div>
         <div class="field-row"><label>Expected Year</label><input type="number" id="inhYear" value="2048"></div>
-        <div class="field-row"><label>Probability (%)</label><input type="number" id="inhProb" value="40" step="1"></div>
+        <div class="field-row"><label>Probability (%)</label><input type="number" id="inhProb" value="80" step="1"></div>
       </div>
-    </details>
+    </div>
 
     <!-- Accounts -->
-    <details open>
-      <summary>Accounts</summary>
+    <div class="section-open">
+      <div class="section-open-header">Accounts</div>
       <div class="section-body">
         <div class="field-row"><label>Brokerage Balance ($)</label><input type="number" id="brokerageBalance" value="100000"></div>
         <div class="field-row"><label>Brokerage Cost Basis ($)</label><input type="number" id="brokerageBasis" value="50000"></div>
@@ -582,28 +556,28 @@ body {
         <div class="field-row"><label>Trad 401k ($)</label><input type="number" id="trad401k" value="220000"></div>
         <div class="field-row"><label>Roth 401k ($)</label><input type="number" id="roth401k" value="55000"></div>
       </div>
-    </details>
+    </div>
 
     <!-- LTC -->
-    <details open>
-      <summary>LTC (Long-Term Care)</summary>
+    <div class="section-open">
+      <div class="section-open-header">LTC (Long-Term Care)</div>
       <div class="section-body">
-        <div class="field-row checkbox-row">
-          <label for="ltcCovered">LTC Coverage</label>
-          <input type="checkbox" id="ltcCovered" checked>
-        </div>
         <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Each person: onset = their death age − drawn duration</div>
         <div class="field-row"><label>LTC Duration Mean (yrs)</label><input type="number" id="ltcDurationMean" value="3" step="0.5"></div>
         <div class="field-row"><label>LTC Duration Std (yrs)</label><input type="number" id="ltcDurationStd" value="2" step="0.5"></div>
         <div class="field-row"><label>LTC Annual Cost ($)</label><input type="number" id="ltcCost" value="90000"></div>
+        <div class="field-row checkbox-row">
+          <label for="ltcCovered">LTC Coverage</label>
+          <input type="checkbox" id="ltcCovered" checked>
+        </div>
         <div class="field-row"><label>LTC Coverage (%)</label><input type="number" id="ltcCoverage" value="50" step="5" min="0" max="100"></div>
         <div class="field-row"><label>LTC Premium / person ($)</label><input type="number" id="ltcPremium" value="3000" step="500"></div>
       </div>
-    </details>
+    </div>
 
     <!-- Social Security -->
-    <details open>
-      <summary>Social Security</summary>
+    <div class="section-open">
+      <div class="section-open-header">Social Security</div>
       <div class="section-body">
         <div class="field-row"><label>SS Start Age</label><input type="number" id="ssStartAge" value="67"></div>
         <div class="field-row"><label>Primary Benefit ($)</label><input type="number" id="ssPrimary" value="32000"></div>
@@ -612,11 +586,11 @@ body {
         <div class="field-row"><label>Haircut Std (%)</label><input type="number" id="ssHaircutStd" value="15" step="1"></div>
         <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">Drawn once per run — models policy/solvency risk</div>
       </div>
-    </details>
+    </div>
 
     <!-- Market & Inflation -->
-    <details open>
-      <summary>Market &amp; Inflation</summary>
+    <div class="section-open">
+      <div class="section-open-header">Market &amp; Inflation</div>
       <div class="section-body">
         <div class="field-row"><label>Inflation Mean (%)</label><input type="number" id="inflMean" value="3" step="0.1"></div>
         <div class="field-row"><label>Inflation Std (%)</label><input type="number" id="inflStd" value="1.5" step="0.1"></div>
@@ -631,11 +605,11 @@ body {
         </div>
         <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">90% stocks → 50% stocks linearly from age 50–70</div>
       </div>
-    </details>
+    </div>
 
     <!-- Guardrails -->
-    <details open>
-      <summary>Guardrails</summary>
+    <div class="section-open">
+      <div class="section-open-header">Guardrails</div>
       <div class="section-body">
         <div class="field-row"><label>Lower Threshold ($)</label><input type="number" id="grLower" value="600000"></div>
         <div class="field-row"><label>Upper Threshold ($)</label><input type="number" id="grUpper" value="4000000"></div>
@@ -644,11 +618,11 @@ body {
         <div class="field-row"><label>Max Cut (%)</label><input type="number" id="grMaxCut" value="25" step="1"></div>
         <div class="field-row"><label>Max Raise (%)</label><input type="number" id="grMaxRaise" value="25" step="1"></div>
       </div>
-    </details>
+    </div>
 
     <!-- Roth Conversion -->
-    <details open>
-      <summary>Roth Conversion</summary>
+    <div class="section-open">
+      <div class="section-open-header">Roth Conversion</div>
       <div class="section-body">
         <div class="field-row checkbox-row">
           <label for="rothActive">Active</label>
@@ -666,11 +640,11 @@ body {
         </div>
         <div class="field-row"><label>Annual Max ($)</label><input type="number" id="rothMax" value="100000"></div>
       </div>
-    </details>
+    </div>
 
     <!-- Longevity -->
-    <details open>
-      <summary>Longevity</summary>
+    <div class="section-open">
+      <div class="section-open-header">Longevity</div>
       <div class="section-body">
         <div class="field-row"><label>Primary Mean Age</label><input type="number" id="lonPrimMean" value="90"></div>
         <div class="field-row"><label>Primary Std</label><input type="number" id="lonPrimStd" value="9"></div>
@@ -679,7 +653,7 @@ body {
         <div class="field-row"><label>Min Age</label><input type="number" id="lonMin" value="72"></div>
         <div class="field-row"><label>Max Age</label><input type="number" id="lonMax" value="110"></div>
       </div>
-    </details>
+    </div>
 
   </div><!-- /accordion-grid -->
 
