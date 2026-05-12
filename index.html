@@ -664,6 +664,12 @@ document.getElementById('content').addEventListener('input', saveInputs);
 // pagehide is the documented hook for "tab is going away, persist now."
 window.addEventListener('pagehide', saveInputs);
 restoreInputs();
+// restoreInputs may have written back uncomma'd values saved by an older
+// build — re-format so the display stays consistent.
+COMMA_FORMATTED_IDS.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.value = formatWithCommas(el.value);
+});
 // Sync conditional rows to current input state — needed on every load, not
 // just after restore, because the inline display:none on spouseStopRow would
 // otherwise stay hidden until the user toggled the checkbox.
