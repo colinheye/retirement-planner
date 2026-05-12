@@ -536,6 +536,10 @@ function restoreInputs() {
 }
 
 document.getElementById('content').addEventListener('change', saveInputs);
+document.getElementById('content').addEventListener('input', saveInputs);
+// iOS Safari can suspend a backgrounded tab without firing change/input —
+// pagehide is the documented hook for "tab is going away, persist now."
+window.addEventListener('pagehide', saveInputs);
 restoreInputs();
 
 // ---- Utilities ----
