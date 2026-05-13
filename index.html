@@ -593,18 +593,6 @@ body {
   <!-- ACCORDION GRID (2 rows × 4 cols) -->
   <div id="accordion-grid">
 
-    <!-- Windfalls -->
-    <div class="section-open">
-      <div class="section-open-header">Windfalls</div>
-      <div class="section-body">
-        <div class="field-row"><label>Annual Gift ($)</label><input type="number" id="giftAmount" value="8000"></div>
-        <div class="field-row"><label>Gift Years Remaining</label><input type="number" id="giftYears" value="3"></div>
-        <div class="field-row"><label>Inheritance Amount ($)</label><input type="number" id="inhAmount" value="250000"></div>
-        <div class="field-row"><label>Expected Year</label><input type="number" id="inhYear" value="2048"></div>
-        <div class="field-row"><label>Inheritance Probability (%)</label><input type="number" id="inhProb" value="80" step="1"></div>
-      </div>
-    </div>
-
     <!-- Accounts -->
     <div class="section-open">
       <div class="section-open-header">Accounts</div>
@@ -623,6 +611,48 @@ body {
         <div class="field-row"><label>Spouse IRA ($/yr)</label><input type="number" id="spouseSavingsIra" value="7000"></div>
         <div class="field-row"><label>HSA ($/yr)</label><input type="number" id="savingsHsa" value="8300"></div>
         <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Each capped by the IRS limit (with age-based catch-ups) and your earned income. Set to 0 to skip a bucket.</div>
+      </div>
+    </div>
+
+    <!-- Windfalls -->
+    <div class="section-open">
+      <div class="section-open-header">Windfalls</div>
+      <div class="section-body">
+        <div class="field-row"><label>Annual Gift ($)</label><input type="number" id="giftAmount" value="8000"></div>
+        <div class="field-row"><label>Gift Years Remaining</label><input type="number" id="giftYears" value="3"></div>
+        <div class="field-row"><label>Inheritance Amount ($)</label><input type="number" id="inhAmount" value="250000"></div>
+        <div class="field-row"><label>Expected Year</label><input type="number" id="inhYear" value="2048"></div>
+        <div class="field-row"><label>Inheritance Probability (%)</label><input type="number" id="inhProb" value="80" step="1"></div>
+      </div>
+    </div>
+
+    <!-- Market & Inflation -->
+    <div class="section-open">
+      <div class="section-open-header">Market &amp; Inflation</div>
+      <div class="section-body">
+        <div class="field-row"><label>Stock Mean (%)</label><input type="number" id="stockMean" value="7" step="0.1"></div>
+        <div class="field-row"><label>Stock Std (%)</label><input type="number" id="stockStd" value="16" step="0.1"></div>
+        <div class="field-row"><label>Bond Mean (%)</label><input type="number" id="bondMean" value="4" step="0.1"></div>
+        <div class="field-row"><label>Bond Std (%)</label><input type="number" id="bondStd" value="5" step="0.1"></div>
+        <div class="field-row"><label>Inflation Mean (%)</label><input type="number" id="inflMean" value="3" step="0.1"></div>
+        <div class="field-row"><label>Inflation Std (%)</label><input type="number" id="inflStd" value="1.5" step="0.1"></div>
+        <div class="field-row"><label>Healthcare Inflation (%)</label><input type="number" id="healthInflation" value="5" step="0.1"></div>
+        <div class="field-row"><label>Education Inflation (%)</label><input type="number" id="eduInflation" value="5" step="0.1"></div>
+        <div class="field-row"><label>Investment Fee Drag (%)</label><input type="number" id="investmentFee" value="0.15" step="0.05"></div>
+        <div class="field-row checkbox-row">
+          <label for="glidePath">Glide Path (bonds near retirement)</label>
+          <input type="checkbox" id="glidePath" checked>
+        </div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">90% stocks → 50% stocks linearly from age 50–70</div>
+      </div>
+    </div>
+
+    <!-- Tax Deductions -->
+    <div class="section-open">
+      <div class="section-open-header">Tax Deductions</div>
+      <div class="section-body">
+        <div class="field-row"><label>Annual Itemized ($)</label><input type="number" id="otherItemized" value="10000"></div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Other than mortgage interest. The model itemizes only when mortgage interest + this value exceeds the standard deduction; otherwise the standard deduction is used.</div>
       </div>
     </div>
 
@@ -661,27 +691,6 @@ body {
       </div>
     </div>
 
-    <!-- Market & Inflation -->
-    <div class="section-open">
-      <div class="section-open-header">Market &amp; Inflation</div>
-      <div class="section-body">
-        <div class="field-row"><label>Stock Mean (%)</label><input type="number" id="stockMean" value="7" step="0.1"></div>
-        <div class="field-row"><label>Stock Std (%)</label><input type="number" id="stockStd" value="16" step="0.1"></div>
-        <div class="field-row"><label>Bond Mean (%)</label><input type="number" id="bondMean" value="4" step="0.1"></div>
-        <div class="field-row"><label>Bond Std (%)</label><input type="number" id="bondStd" value="5" step="0.1"></div>
-        <div class="field-row"><label>Inflation Mean (%)</label><input type="number" id="inflMean" value="3" step="0.1"></div>
-        <div class="field-row"><label>Inflation Std (%)</label><input type="number" id="inflStd" value="1.5" step="0.1"></div>
-        <div class="field-row"><label>Healthcare Inflation (%)</label><input type="number" id="healthInflation" value="5" step="0.1"></div>
-        <div class="field-row"><label>Education Inflation (%)</label><input type="number" id="eduInflation" value="5" step="0.1"></div>
-        <div class="field-row"><label>Investment Fee Drag (%)</label><input type="number" id="investmentFee" value="0.15" step="0.05"></div>
-        <div class="field-row checkbox-row">
-          <label for="glidePath">Glide Path (bonds near retirement)</label>
-          <input type="checkbox" id="glidePath" checked>
-        </div>
-        <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">90% stocks → 50% stocks linearly from age 50–70</div>
-      </div>
-    </div>
-
     <!-- Guardrails -->
     <div class="section-open">
       <div class="section-open-header">Guardrails</div>
@@ -715,15 +724,6 @@ body {
           </select>
         </div>
         <div class="field-row"><label>Annual Max ($)</label><input type="number" id="rothMax" value="100000"></div>
-      </div>
-    </div>
-
-    <!-- Tax Deductions -->
-    <div class="section-open">
-      <div class="section-open-header">Tax Deductions</div>
-      <div class="section-body">
-        <div class="field-row"><label>Annual Itemized ($)</label><input type="number" id="otherItemized" value="10000"></div>
-        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Other than mortgage interest. The model itemizes only when mortgage interest + this value exceeds the standard deduction; otherwise the standard deduction is used.</div>
       </div>
     </div>
 
