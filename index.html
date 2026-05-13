@@ -74,6 +74,9 @@ body {
 }
 #runBtn {
   padding: 9px 22px;
+  /* Fits "Run Simulation"; locks the width so the "Running…" state
+     doesn't shrink the button. */
+  min-width: 145px;
   background: #3d5ede;
   color: #fff;
   border: none;
@@ -84,6 +87,7 @@ body {
   letter-spacing: 0.3px;
   transition: background 0.15s;
   white-space: nowrap;
+  text-align: center;
 }
 #runBtn:hover { background: #4a6eee; }
 #runBtn:disabled { background: #3a4060; color: #6a75a0; cursor: not-allowed; }
