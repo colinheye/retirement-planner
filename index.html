@@ -559,6 +559,7 @@ body {
           <div class="field-row"><label>Sell/Move Year</label><input type="number" id="houseSellYear" value="2034"></div>
           <div class="field-row"><label>New Home Value ($)</label><input type="number" id="newHomeValue" value="550000"></div>
           <div class="field-row"><label>Down Payment (%)</label><input type="number" id="newDownPayment" value="20" step="1" min="0" max="100"></div>
+          <div class="field-row"><label>New Mortgage Years</label><input type="number" id="newMortgageYears" value="30"></div>
           <div class="field-row"><label>New Mortgage Rate (%)</label><input type="number" id="newMortgageRate" value="6.50" step="0.1"></div>
         </div>
       </div>
@@ -656,7 +657,7 @@ body {
         <div class="field-row"><label>Spouse Benefit ($)</label><input type="number" id="ssSpouse" value="16000"></div>
         <div class="field-row"><label>Haircut Mean (%)</label><input type="number" id="ssHaircut" value="80" step="1"></div>
         <div class="field-row"><label>Haircut Std (%)</label><input type="number" id="ssHaircutStd" value="15" step="1"></div>
-        <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">Drawn once per run — models policy/solvency risk</div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">Haircut is the percent of your stated benefit you actually receive. Models the risk that Social Security's trust fund depletes (currently projected ~2034) and benefits are cut. Drawn once per run; ~80% reflects current post-depletion projections.</div>
       </div>
     </div>
 
@@ -664,13 +665,14 @@ body {
     <div class="section-open">
       <div class="section-open-header">Market &amp; Inflation</div>
       <div class="section-body">
-        <div class="field-row"><label>Inflation Mean (%)</label><input type="number" id="inflMean" value="3" step="0.1"></div>
-        <div class="field-row"><label>Inflation Std (%)</label><input type="number" id="inflStd" value="1.5" step="0.1"></div>
         <div class="field-row"><label>Stock Mean (%)</label><input type="number" id="stockMean" value="7" step="0.1"></div>
         <div class="field-row"><label>Stock Std (%)</label><input type="number" id="stockStd" value="16" step="0.1"></div>
         <div class="field-row"><label>Bond Mean (%)</label><input type="number" id="bondMean" value="4" step="0.1"></div>
         <div class="field-row"><label>Bond Std (%)</label><input type="number" id="bondStd" value="5" step="0.1"></div>
+        <div class="field-row"><label>Inflation Mean (%)</label><input type="number" id="inflMean" value="3" step="0.1"></div>
+        <div class="field-row"><label>Inflation Std (%)</label><input type="number" id="inflStd" value="1.5" step="0.1"></div>
         <div class="field-row"><label>Healthcare Inflation (%)</label><input type="number" id="healthInflation" value="5" step="0.1"></div>
+        <div class="field-row"><label>Education Inflation (%)</label><input type="number" id="eduInflation" value="5" step="0.1"></div>
         <div class="field-row"><label>Investment Fee Drag (%)</label><input type="number" id="investmentFee" value="0.15" step="0.05"></div>
         <div class="field-row checkbox-row">
           <label for="glidePath">Glide Path (bonds near retirement)</label>
@@ -684,6 +686,7 @@ body {
     <div class="section-open">
       <div class="section-open-header">Guardrails</div>
       <div class="section-body">
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 6px;">Adjusts retirement spending year-by-year based on portfolio level. Below the Lower Threshold, spending is cut by Spend Cut % each year (capped at Max Cut). Above the Upper Threshold, spending rises by Spend Raise % (capped at Max Raise). Thresholds inflate over time.</div>
         <div class="field-row"><label>Lower Threshold ($)</label><input type="number" id="grLower" value="600000"></div>
         <div class="field-row"><label>Upper Threshold ($)</label><input type="number" id="grUpper" value="4000000"></div>
         <div class="field-row"><label>Spend Cut (%)</label><input type="number" id="grCut" value="10" step="1"></div>
@@ -1088,7 +1091,7 @@ function runOnce(cfg) {
     // --- Inflation ---
     const annualInfl = Math.max(-0.02, normalSample(cfg.inflMean, cfg.inflStd));
     priceLevel *= (1 + annualInfl);
-    const eduSpread = 0.02;
+    const eduSpread = cfg.eduInflation - cfg.inflMean;
     eduPriceLevel *= (1 + annualInfl + eduSpread);
     const healthSpread = cfg.healthInflation - cfg.inflMean;
     healthPriceLevel *= (1 + annualInfl + healthSpread);
@@ -1118,7 +1121,7 @@ function runOnce(cfg) {
       homeVal = newP;
       homeMortgage = newP - down;
       mortgageRate = cfg.newMortgageRate;
-      mortgagePmt = mortgagePayment(homeMortgage, mortgageRate, 30);
+      mortgagePmt = mortgagePayment(homeMortgage, mortgageRate, cfg.newMortgageYears);
     }
 
     // --- LTC home sale ---
@@ -1668,6 +1671,7 @@ function readConfig() {
     houseSellYear:   vi('houseSellYear'),
     newHomeValue:    v('newHomeValue'),
     newDownPayment:  v('newDownPayment'),
+    newMortgageYears: Math.max(1, vi('newMortgageYears')),
     newMortgageRate: v('newMortgageRate') / 100,
 
     vacActive:        vb('vacActive'),
@@ -1691,6 +1695,7 @@ function readConfig() {
     inflMean:  v('inflMean') / 100,
     inflStd:   v('inflStd') / 100,
     healthInflation: v('healthInflation') / 100,
+    eduInflation:    v('eduInflation') / 100,
     stockMean: v('stockMean') / 100,
     stockStd:  v('stockStd') / 100,
     bondMean:  v('bondMean') / 100,
