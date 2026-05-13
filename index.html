@@ -1939,7 +1939,15 @@ async function startSimulation() {
 
   const proc = processResults(allRuns);
   const successRate = 100 * (1 - fails / cfg.simCount);
-  document.getElementById('metricSuccess').textContent = successRate.toFixed(1) + '%';
+  const successEl = document.getElementById('metricSuccess');
+  successEl.textContent = successRate.toFixed(1) + '%';
+  // Threshold colors mirror the About-section guidance: ≥80% comfortable,
+  // 70–80% borderline (needs flexibility), <70% leaves little room for
+  // surprises.
+  successEl.style.color =
+    successRate < 70 ? '#d04545' :
+    successRate < 80 ? '#e6c845' :
+                       '#27ae60';
   renderExpenseChart(proc.p20History);
 
   prog.style.display = 'none';
