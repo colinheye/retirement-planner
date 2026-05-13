@@ -75,6 +75,11 @@ body {
   font-weight: 800;
   color: #27ae60;
   line-height: 1;
+  /* Reserve enough room for the widest realistic value ("100%") so the
+     container doesn't reflow when switching between the "—" placeholder
+     and a result. */
+  min-width: 56px;
+  text-align: right;
 }
 #runBtn {
   padding: 9px 22px;
@@ -1977,7 +1982,7 @@ async function startSimulation() {
   const proc = processResults(allRuns);
   const successRate = 100 * (1 - fails / cfg.simCount);
   const successEl = document.getElementById('metricSuccess');
-  successEl.textContent = successRate.toFixed(1) + '%';
+  successEl.textContent = Math.round(successRate) + '%';
   // Threshold colors mirror the About-section guidance: ≥80% comfortable,
   // 70–80% borderline (needs flexibility), <70% leaves little room for
   // surprises.
