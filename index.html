@@ -1254,6 +1254,10 @@ function runOnce(cfg) {
     }
 
     let vacCost = 0;
+    let vacGrossCost = 0;      // mortgage + tax + maintenance (for the chart's Home band)
+    let vacRentalIncome = 0;   // rental (for the income line; kept separate so a
+                                // high-rental vacation home doesn't pull the Home band
+                                // negative when costs amortize down).
     let vacMortInterest = 0;
     if (vacActive) {
       let vacMortPay = 0;
@@ -1265,7 +1269,9 @@ function runOnce(cfg) {
         else { vacMortPay = annPmt; vacMortgage -= princ; }
       }
       const own = cfg.vacOwnership / 100;
-      vacCost = vacMortPay + (cfg.vacPropTax / 100) * vacHomeVal * own + cfg.vacMaintenance * infl * own - cfg.vacRental * infl * own;
+      vacGrossCost = vacMortPay + (cfg.vacPropTax / 100) * vacHomeVal * own + cfg.vacMaintenance * infl * own;
+      vacRentalIncome = cfg.vacRental * infl * own;
+      vacCost = vacGrossCost - vacRentalIncome;
     }
     const totalExp = living + kidsCost + health + ltcPremiums + mortPay + propTax + carCost + repairCost + vacCost;
 
@@ -1532,7 +1538,8 @@ function runOnce(cfg) {
       expCar:       carCost,
       expRepair:    repairCost,
       expLtcPrem:   ltcPremiums,
-      expVac:       vacCost,
+      expVac:       vacGrossCost,
+      rentalIncome: vacRentalIncome,
       ssIncome:   ss,
       wageIncome: wage,
     });
@@ -1809,7 +1816,7 @@ function renderExpenseChart(history) {
     return {
       age: h.age,
       cats,
-      income:   (h.wageIncome || 0) + (h.ssIncome || 0),
+      income:   (h.wageIncome || 0) + (h.ssIncome || 0) + (h.rentalIncome || 0),
       netWorth: h.netWorth || 0,
       total:    cats.reduce((s, v) => s + v, 0),
     };
