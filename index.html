@@ -35,8 +35,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Enforces a minimum gap between the title/subtitle and the success
+     rate + Run button on narrow viewports. */
+  gap: 16px;
   flex-shrink: 0;
 }
+#topbar-title { min-width: 0; }
 #topbar-title h1 {
   font-size: 15px;
   font-weight: 700;
