@@ -522,6 +522,8 @@ body {
           <div class="field-row"><label>Other Monthly ($/mo)</label><input type="number" id="expOtherMonthly" value="500"></div>
 
           <div class="exp-subhead">Annual (non-monthly)</div>
+          <div class="field-row"><label>Healthcare ($/yr)</label><input type="number" id="expHealthcare" value="5000"></div>
+          <div style="font-size:11px;color:#7a85a0;margin:2px 0 6px;">Your current annual out-of-pocket cost. In retirement the model automatically adds a ~$12k/yr Medicare + supplemental baseline (inflated at the healthcare rate) on top of this amount; LTC events stack further when active.</div>
           <div class="field-row"><label>Travel ($/yr)</label><input type="number" id="expTravel" value="10000"></div>
           <div class="field-row"><label>Gifts &amp; Charity ($/yr)</label><input type="number" id="expGiftsCharity" value="4000"></div>
           <div class="field-row"><label>Other Annual ($/yr)</label><input type="number" id="expOtherAnnual" value="4000"></div>
@@ -759,7 +761,7 @@ document.getElementById('moveToNewHome').addEventListener('change', function() {
 // ---- Expense input mode toggle (annual total / by category) ----
 const EXP_MONTHLY_IDS = ['expGroceries', 'expDining', 'expUtilities', 'expTransport',
                          'expSubscriptions', 'expPersonal', 'expOtherMonthly'];
-const EXP_ANNUAL_IDS  = ['expTravel', 'expGiftsCharity', 'expOtherAnnual'];
+const EXP_ANNUAL_IDS  = ['expHealthcare', 'expTravel', 'expGiftsCharity', 'expOtherAnnual'];
 
 function _stripCommas(v) { return parseFloat(String(v).replace(/,/g, '')) || 0; }
 
@@ -814,7 +816,7 @@ const COMMA_FORMATTED_IDS = new Set([
   'baseLiving', 'ltcCost', 'ltcPremium',
   'expGroceries', 'expDining', 'expUtilities', 'expTransport',
   'expSubscriptions', 'expPersonal', 'expOtherMonthly',
-  'expTravel', 'expGiftsCharity', 'expOtherAnnual',
+  'expHealthcare', 'expTravel', 'expGiftsCharity', 'expOtherAnnual',
   'carCost', 'kidBaseCost', 'kidDaycareCost', 'kidSchoolCost', 'kidCollegeCost',
   'brokerageBalance', 'brokerageBasis', 'hsa', 'ira', 'trad401k', 'roth401k',
   'savings401k', 'spouseSavings401k', 'savingsIra', 'spouseSavingsIra', 'savingsHsa',
