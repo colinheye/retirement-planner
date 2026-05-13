@@ -1949,7 +1949,6 @@ async function startSimulation() {
     const p = Math.round(shown * 100);
     progBar.style.width = p + '%';
     progLabel.textContent = `Running simulations… ${p}%`;
-    btn.textContent = `Running… ${p}%`;
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
