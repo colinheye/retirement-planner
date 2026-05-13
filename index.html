@@ -1933,12 +1933,39 @@ async function startSimulation() {
 
   const cfg = readConfig();
 
-  const { allRuns, fails, failYears } = await runMonteCarlo(cfg, pct => {
-    const p = Math.round(pct * 100);
+  // The bar advances at the slower of (a) actual simulation progress and
+  // (b) elapsed time over MIN_DURATION_MS. So fast machines get a "the
+  // computer is thinking" feel rather than a 50ms flash, while slow
+  // machines see the bar honestly track the work.
+  const MIN_DURATION_MS = 2000;
+  const startTime = performance.now();
+  let simProgress = 0;
+  let ticking = true;
+
+  const tick = () => {
+    if (!ticking) return;
+    const timeProg = Math.min(1, (performance.now() - startTime) / MIN_DURATION_MS);
+    const shown = Math.min(simProgress, timeProg);
+    const p = Math.round(shown * 100);
     progBar.style.width = p + '%';
     progLabel.textContent = `Running simulations… ${p}%`;
-    btn.textContent = p < 100 ? `Running… ${p}%` : 'Running…';
+    btn.textContent = `Running… ${p}%`;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+
+  const { allRuns, fails, failYears } = await runMonteCarlo(cfg, pct => {
+    simProgress = pct;
   });
+  simProgress = 1;
+
+  // Hold the bar visible for the minimum duration so the run feels
+  // substantial rather than instant.
+  const elapsed = performance.now() - startTime;
+  if (elapsed < MIN_DURATION_MS) {
+    await new Promise(r => setTimeout(r, MIN_DURATION_MS - elapsed));
+  }
+  ticking = false;
 
   const proc = processResults(allRuns);
   const successRate = 100 * (1 - fails / cfg.simCount);
