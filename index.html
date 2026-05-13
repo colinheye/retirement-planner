@@ -671,7 +671,7 @@ body {
           <input type="checkbox" id="ltcCovered" checked>
         </div>
         <div class="field-row"><label>LTC Coverage (%)</label><input type="number" id="ltcCoverage" value="50" step="5" min="0" max="100"></div>
-        <div class="field-row"><label>LTC Premium / person ($)</label><input type="number" id="ltcPremium" value="3000" step="500"></div>
+        <div class="field-row"><label>LTC Premium / person ($/mo)</label><input type="number" id="ltcPremium" value="250" step="25"></div>
         <div class="field-row checkbox-row">
           <label for="sellHomeForLtc">Sell Home to Fund LTC</label>
           <input type="checkbox" id="sellHomeForLtc" checked>
@@ -1234,7 +1234,10 @@ function runOnce(cfg) {
     const healthBase   = isRetired ? 12000 * healthInfl : 0;
     const ltcEventCost = isRetired ? (ltcCount * cfg.ltcCost * (1 - coverageFrac) * healthInfl) : 0;
     const health = healthBase + ltcEventCost;
-    const ltcPremiums = ltcPremiumCount * cfg.ltcPremium * healthInfl;
+    // Premium is entered monthly; multiply to annual. Inflated at the
+    // healthcare rate since real LTC carriers raise rates on existing
+    // policies in line with broader healthcare cost growth.
+    const ltcPremiums = ltcPremiumCount * cfg.ltcPremium * 12 * healthInfl;
 
     // Car purchases stop after age 80 — most people stop driving / replacing
     // vehicles around then; preserved cars carry on without a new outlay.
