@@ -1528,18 +1528,12 @@ function runOnce(cfg) {
       }
     }
 
-    // Zero out liquid wealth permanently on failure. The primary home is
-    // intentionally NOT zeroed here — even with no cash to pay them, property
-    // tax and maintenance are real ongoing obligations and should keep
-    // showing in the chart. The only thing that legitimately ends home
-    // expenses is the LTC home sale (if enabled). The vacation home was
-    // already sold during the pre-failure rescue above.
-    if (failed) {
-      hsa = 0; ira = 0; trad401k = 0; roth401k = 0;
-      brokBal = 0; brokBasis = 0;
-      vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
-      liq = 0;
-    }
+    // No post-failure wealth wiping. The model's per-account pulls are
+    // already bounded by available balances, so depleted accounts behave
+    // correctly without resetting them. Wiping was previously masking real
+    // events — most notably the proceeds from LTC primary-home and rescue
+    // vacation-home sales, which legitimately sit in brokBal after the
+    // sale and should remain visible as net worth.
 
     const homeEquity = Math.max(0, homeVal - homeMortgage);
     const vacEquity  = vacActive
