@@ -697,7 +697,7 @@ body {
           <label for="sellHomeForLtc">Sell Primary Home to Fund LTC</label>
           <input type="checkbox" id="sellHomeForLtc" checked>
         </div>
-        <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">When the first LTC event starts, sell the primary home and move proceeds to brokerage. Uncheck to keep the home (and its property tax + maintenance) through end of life. The vacation home has its own toggle in the Vacation Home section.</div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">Sells the primary home at the <strong>second</strong> LTC event (when both spouses have entered care, or the surviving spouse enters care after the other has died), and moves proceeds to brokerage. Uncheck to keep the home through end of life. The vacation home has its own toggle in the Vacation Home section.</div>
       </div>
     </div>
 
@@ -1097,7 +1097,8 @@ function runOnce(cfg) {
   const sLtcDur   = Math.max(1, Math.round(clamp(normalSample(cfg.ltcDurationMean, cfg.ltcDurationStd), 1, 15)));
   const pLtcStart = Math.max(70, pLife - pLtcDur);
   const sLtcStart = Math.max(70, sLife - sLtcDur);
-  const firstLtcAge = Math.min(pLtcStart, sLtcStart);
+  const firstLtcAge  = Math.min(pLtcStart, sLtcStart);
+  const secondLtcAge = Math.max(pLtcStart, sLtcStart);
 
   const taxEngine = new TaxEngine();
 
@@ -1147,8 +1148,12 @@ function runOnce(cfg) {
       mortgagePmt = mortgagePayment(homeMortgage, mortgageRate, cfg.newMortgageYears);
     }
 
-    // --- LTC home sale ---
-    if (cfg.sellHomeForLtc && age === firstLtcAge && !homeSold && homeVal > 0) {
+    // --- LTC primary home sale (at second LTC event) ---
+    // Held until the later of the two LTC starts so a still-healthy spouse
+    // isn't displaced; also covers the case where one spouse died without
+    // an LTC event (their pLtcStart still defaults to 70, so secondLtcAge
+    // is the surviving spouse's onset).
+    if (cfg.sellHomeForLtc && age === secondLtcAge && !homeSold && homeVal > 0) {
       const sellCosts = homeVal * 0.06;
       const netProceeds = Math.max(0, homeVal - homeMortgage - sellCosts);
       brokBal   += netProceeds;
