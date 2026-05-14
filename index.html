@@ -674,7 +674,7 @@ body {
       <div class="section-open-header">Tax Deductions</div>
       <div class="section-body">
         <div class="field-row"><label>Annual Itemized ($)</label><input type="number" id="otherItemized" value="10000"></div>
-        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Other than mortgage interest. The model itemizes only when mortgage interest + this value exceeds the standard deduction; otherwise the standard deduction is used.</div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Non-SALT, non-mortgage items only (charitable, etc.). Property tax is computed automatically and capped at the $10K SALT limit. The model itemizes only when mortgage interest + SALT + this value exceeds the standard deduction.</div>
       </div>
     </div>
 
@@ -1296,6 +1296,7 @@ function runOnce(cfg) {
                                 // high-rental vacation home doesn't pull the Home band
                                 // negative when costs amortize down).
     let vacMortInterest = 0;
+    let vacPropTax = 0;
     if (vacActive) {
       let vacMortPay = 0;
       if (vacMortgage > 0) {
@@ -1306,7 +1307,8 @@ function runOnce(cfg) {
         else { vacMortPay = annPmt; vacMortgage -= princ; }
       }
       const own = cfg.vacOwnership / 100;
-      vacGrossCost = vacMortPay + (cfg.vacPropTax / 100) * vacHomeVal * own + cfg.vacMaintenance * infl * own;
+      vacPropTax = (cfg.vacPropTax / 100) * vacHomeVal * own;
+      vacGrossCost = vacMortPay + vacPropTax + cfg.vacMaintenance * infl * own;
       vacRentalIncome = cfg.vacRental * infl * own;
       vacCost = vacGrossCost - vacRentalIncome;
     }
@@ -1314,7 +1316,19 @@ function runOnce(cfg) {
 
     // Set the year's itemized total; calcTax internally uses
     // max(stdDeduction, itemizedDed) so itemizing only kicks in when it wins.
-    taxEngine.itemizedDed = mortgageInterest + vacMortInterest + cfg.otherItemized * infl;
+    // TCJA's $750K combined acquisition-debt cap was made permanent by OBBBA
+    // (2025) at a flat $750K — no inflation indexing.
+    const combinedAcqDebt = homeMortgage + (vacActive ? vacMortgage : 0);
+    const mortDebtCap = 750000;
+    const deductibleFrac = combinedAcqDebt > 0
+      ? Math.min(1, mortDebtCap / combinedAcqDebt)
+      : 1;
+    const deductibleMortInt = (mortgageInterest + vacMortInterest) * deductibleFrac;
+    // SALT cap: $10K flat (TCJA, made permanent by OBBBA after the temporary
+    // 2025–2029 $40K bump expires). Property tax alone typically fills it for
+    // this household, so state income tax is implicitly absorbed by the cap.
+    const saltDeductible = Math.min(10000, propTax + vacPropTax);
+    taxEngine.itemizedDed = deductibleMortInt + saltDeductible + cfg.otherItemized * infl;
 
     // --- MARKET RETURNS ---
     const sp = stockPct(age, cfg.glidePath);
@@ -1363,9 +1377,13 @@ function runOnce(cfg) {
                                  Math.max(0, wage - pretax401k));
       const taxableWage = wage - pretax401k - pretaxHsa;
 
-      const tax = taxEngine.calcTax(taxableWage, 0);
+      // Vacation rental income is ordinary taxable income (Schedule E in
+      // reality; treated here as flowing through the same federal bracket
+      // table). FICA does not apply to rental income.
+      const taxableIncome = taxableWage + vacRentalIncome;
+      const tax = taxEngine.calcTax(taxableIncome, 0);
 
-      // FICA
+      // FICA (wage-only)
       const ssWageBase = 168600 * infl;
       const primaryGross = income * infl;
       let fica = 0.062 * Math.min(primaryGross, ssWageBase) + 0.0145 * primaryGross;
@@ -1375,7 +1393,10 @@ function runOnce(cfg) {
       const combinedGross = primaryGross + (spouseWorking ? spouseWage : 0);
       fica += 0.009 * Math.max(0, combinedGross - 250000);
 
-      const net = (taxableWage - tax - fica) - totalExp;
+      // Net Investment Income Tax (3.8%) on rental for MAGI > $250K MFJ.
+      const niitRental = 0.038 * Math.min(vacRentalIncome, Math.max(0, taxableIncome - 250000));
+
+      const net = (taxableWage - tax - fica - niitRental) - totalExp;
 
       trad401k += pretax401k;
       hsa      += pretaxHsa;
@@ -1459,10 +1480,13 @@ function runOnce(cfg) {
       }
 
       const ssTaxable = calcSsTaxable(rmd + rothConv, ss);
-      const ordinaryBase = rmd + rothConv + ssTaxable;
+      // Vacation rental income is ordinary taxable income in retirement too.
+      const ordinaryBase = rmd + rothConv + ssTaxable + vacRentalIncome;
       const combinedTax = taxEngine.calcTax(ordinaryBase, 0);
+      // NIIT (3.8%) on rental for retirees over the MAGI threshold.
+      const niitRental = 0.038 * Math.min(vacRentalIncome, Math.max(0, ordinaryBase - 250000));
 
-      const netIncome = rmd + ss - combinedTax;
+      const netIncome = rmd + ss - combinedTax - niitRental;
       let needed = totalExp - netIncome;
 
       if (needed <= 0) {
