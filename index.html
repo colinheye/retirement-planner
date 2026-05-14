@@ -602,6 +602,11 @@ body {
           <div class="field-row"><label>Annual Rental Income ($)</label><input type="number" id="vacRental" value="30000" step="5000"></div>
           <div class="field-row"><label>Sell Year (0=never)</label><input type="number" id="vacSellYear" value="0"></div>
           <div class="field-row"><label>Your Ownership (%)</label><input type="number" id="vacOwnership" value="100" step="5" min="1" max="100"></div>
+          <div class="field-row checkbox-row">
+            <label for="sellVacForLtc">Sell to Fund LTC</label>
+            <input type="checkbox" id="sellVacForLtc" checked>
+          </div>
+          <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">When the first LTC event starts, sell the vacation home and move your share of proceeds to brokerage. Uncheck to keep it through end of life.</div>
         </div>
       </div>
     </div>
@@ -689,10 +694,10 @@ body {
         <div class="field-row"><label>LTC Coverage (%)</label><input type="number" id="ltcCoverage" value="50" step="5" min="0" max="100"></div>
         <div class="field-row"><label>LTC Premium / person ($/mo)</label><input type="number" id="ltcPremium" value="250" step="25"></div>
         <div class="field-row checkbox-row">
-          <label for="sellHomeForLtc">Sell Home to Fund LTC</label>
+          <label for="sellHomeForLtc">Sell Primary Home to Fund LTC</label>
           <input type="checkbox" id="sellHomeForLtc" checked>
         </div>
-        <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">When the first LTC event starts, sell the primary home and move proceeds to brokerage. Uncheck to keep the home (and its property tax + maintenance) through end of life.</div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">When the first LTC event starts, sell the primary home and move proceeds to brokerage. Uncheck to keep the home (and its property tax + maintenance) through end of life. The vacation home has its own toggle in the Vacation Home section.</div>
       </div>
     </div>
 
@@ -1150,6 +1155,13 @@ function runOnce(cfg) {
       brokBasis += netProceeds;
       homeVal = 0; homeMortgage = 0; mortgagePmt = 0;
       homeSold = true;
+    }
+    // --- LTC vacation home sale (separate toggle) ---
+    if (cfg.sellVacForLtc && age === firstLtcAge && vacActive) {
+      const net = Math.max(0, vacHomeVal * (cfg.vacOwnership / 100) * (1 - 0.06) - vacMortgage);
+      brokBal   += net;
+      brokBasis += net;
+      vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
     }
 
     // --- VACATION HOME BUY / SELL ---
@@ -1700,6 +1712,7 @@ function readConfig() {
     vacRental:        v('vacRental'),
     vacSellYear:      vi('vacSellYear'),
     vacOwnership:     v('vacOwnership'),
+    sellVacForLtc:    vb('sellVacForLtc'),
 
     giftAmount: v('giftAmount'),
     giftYears:  vi('giftYears'),
