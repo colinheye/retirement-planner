@@ -496,7 +496,7 @@ body {
     <div class="section-open">
       <div class="section-open-header">Children</div>
       <div class="section-body">
-        <div class="field-row"><label>Birth Years (comma-sep)</label><input type="text" id="childBirthYears" value="" placeholder="e.g. 2027,2029"></div>
+        <div class="field-row"><label>Birth Years (comma-sep)</label><input type="text" id="childBirthYears" inputmode="numeric" pattern="[0-9,\s]*" value="" placeholder="e.g. 2027,2029"></div>
         <div id="carePhasesSection">
           <div class="exp-subhead">Annual cost per child</div>
           <div class="field-row"><label>Baseline 0–18 ($)</label><input type="number" id="kidBaseCost" value="12000"></div>
@@ -879,6 +879,13 @@ COMMA_FORMATTED_IDS.forEach(id => {
   el.type = 'text';
   el.inputMode = 'numeric';
   el.value = formatWithCommas(el.value);
+});
+
+// Force the iOS 10-key number pad on every remaining numeric input.
+// type="number" alone shows the full keyboard on iOS; inputmode="decimal"
+// forces the keypad (permissive enough for integers and decimals alike).
+document.querySelectorAll('#content input[type="number"]').forEach(el => {
+  if (!el.hasAttribute('inputmode')) el.setAttribute('inputmode', 'decimal');
 });
 
 document.getElementById('content').addEventListener('input', e => {
