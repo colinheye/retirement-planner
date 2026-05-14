@@ -602,11 +602,7 @@ body {
           <div class="field-row"><label>Annual Rental Income ($)</label><input type="number" id="vacRental" value="30000" step="5000"></div>
           <div class="field-row"><label>Sell Year (0=never)</label><input type="number" id="vacSellYear" value="0"></div>
           <div class="field-row"><label>Your Ownership (%)</label><input type="number" id="vacOwnership" value="100" step="5" min="1" max="100"></div>
-          <div class="field-row checkbox-row">
-            <label for="sellVacForLtc">Sell to Fund LTC</label>
-            <input type="checkbox" id="sellVacForLtc" checked>
-          </div>
-          <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">When the first LTC event starts, sell the vacation home and move your share of proceeds to brokerage. Uncheck to keep it through end of life.</div>
+          <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">The vacation home is liquidated automatically if liquid assets drop below the Min Liquid Buffer; otherwise it stays until the Sell Year above.</div>
         </div>
       </div>
     </div>
@@ -697,7 +693,7 @@ body {
           <label for="sellHomeForLtc">Sell Primary Home to Fund LTC</label>
           <input type="checkbox" id="sellHomeForLtc" checked>
         </div>
-        <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">Sells the primary home at the <strong>second</strong> LTC event (when both spouses have entered care, or the surviving spouse enters care after the other has died), and moves proceeds to brokerage. Uncheck to keep the home through end of life. The vacation home has its own toggle in the Vacation Home section.</div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 0;">Sells the primary home at the <strong>second</strong> LTC event (when both spouses have entered care, or the surviving spouse enters care after the other has died), and moves proceeds to brokerage. Uncheck to keep the home through end of life. (The vacation home, if any, is sold automatically only when liquid drops below the Min Liquid Buffer.)</div>
       </div>
     </div>
 
@@ -1161,13 +1157,10 @@ function runOnce(cfg) {
       homeVal = 0; homeMortgage = 0; mortgagePmt = 0;
       homeSold = true;
     }
-    // --- LTC vacation home sale (separate toggle) ---
-    if (cfg.sellVacForLtc && age === firstLtcAge && vacActive) {
-      const net = Math.max(0, vacHomeVal * (cfg.vacOwnership / 100) * (1 - 0.06) - vacMortgage);
-      brokBal   += net;
-      brokBasis += net;
-      vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
-    }
+    // (No unconditional vacation home sale at LTC. The vacation home is
+    // only liquidated when needed — via the user-specified vacSellYear or
+    // the failure rescue path below, which sells the vacation home if
+    // liquid drops below the buffer.)
 
     // --- VACATION HOME BUY / SELL ---
     if (cfg.vacActive && yr === cfg.vacBuyYear && !vacActive) {
@@ -1552,14 +1545,16 @@ function runOnce(cfg) {
     // vacation-home sales, which legitimately sit in brokBal after the
     // sale and should remain visible as net worth.
 
-    const homeEquity = Math.max(0, homeVal - homeMortgage);
+    // Primary home equity is intentionally excluded from net worth — it's
+    // where the household lives, not a spendable asset. Vacation home
+    // equity is treated as investment property and IS included.
     const vacEquity  = vacActive
       ? Math.max(0, vacHomeVal * (cfg.vacOwnership / 100) - vacMortgage)
       : 0;
     history.push({
       year: yr, age,
       liquidAssets: Math.max(0, liq),
-      netWorth:   Math.max(0, liq) + homeEquity + vacEquity,
+      netWorth:   Math.max(0, liq) + vacEquity,
       brokerage:  Math.max(0, brokBal),
       hsa:        Math.max(0, hsa),
       ira:        Math.max(0, ira),
@@ -1609,13 +1604,13 @@ async function runMonteCarlo(cfg, onProgress) {
 // ---- Result processing ----
 function processResults(allRuns, cfg) {
   const retAge = cfg.retirementAge;
-  // Sort by the lowest net worth the run dips to during retirement. This
-  // matches the cyan line on the chart: a 20th-percentile run by this
-  // metric will visibly dip low at some point in retirement, regardless of
-  // whether liquid recovered later from home-sale proceeds. Previously
-  // sorted by minimum liquid in retirement, but that produced runs where
-  // liquid bottomed below the buffer yet net worth stayed high (home
-  // equity intact), making the chart look unexpectedly prosperous.
+  // Two-tier sort so the 20th-percentile sample lands in the genuinely
+  // stressed tail. Failed runs (liquid breached minBuffer) go first,
+  // ordered by their deepest retirement net-worth dip; successful runs
+  // come after, ordered the same way. Sorting only by min retirement net
+  // worth wasn't enough: nominal home appreciation over decades leaves
+  // even bottom-of-the-pack runs with multi-million net worth on paper,
+  // so a single-key sort buried the actual failures.
   const indexed = allRuns.map((r, i) => {
     let minRetNw = Infinity;
     for (const h of r.history) {
@@ -1623,12 +1618,16 @@ function processResults(allRuns, cfg) {
     }
     return {
       idx: i,
+      failed: !!r.failed,
       final: r.history[r.history.length - 1]?.liquidAssets ?? 0,
       minRetNw: minRetNw === Infinity ? 0 : minRetNw,
     };
   });
   const medianLegacy = percentile(indexed.map(x => x.final), 50);
-  indexed.sort((a, b) => a.minRetNw - b.minRetNw);
+  indexed.sort((a, b) => {
+    if (a.failed !== b.failed) return a.failed ? -1 : 1;
+    return a.minRetNw - b.minRetNw;
+  });
   const p20Run = indexed[Math.floor(indexed.length * 0.20)];
   const p20History = p20Run ? allRuns[p20Run.idx].history : [];
   return { medianLegacy, p20History };
@@ -1732,7 +1731,6 @@ function readConfig() {
     vacRental:        v('vacRental'),
     vacSellYear:      vi('vacSellYear'),
     vacOwnership:     v('vacOwnership'),
-    sellVacForLtc:    vb('sellVacForLtc'),
 
     giftAmount: v('giftAmount'),
     giftYears:  vi('giftYears'),
