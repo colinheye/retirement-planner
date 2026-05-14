@@ -1607,13 +1607,27 @@ async function runMonteCarlo(cfg, onProgress) {
 }
 
 // ---- Result processing ----
-function processResults(allRuns) {
-  const indexed = allRuns.map((r, i) => ({
-    idx: i,
-    final: r.history[r.history.length - 1]?.liquidAssets ?? 0,
-  }));
-  indexed.sort((a, b) => a.final - b.final);
+function processResults(allRuns, cfg) {
+  const retAge = cfg.retirementAge;
+  const indexed = allRuns.map((r, i) => {
+    // Stress metric: the lowest liquid balance the run sees during
+    // retirement. Captures "how close did this run come to failing"
+    // regardless of whether it recovered later from a home sale,
+    // inheritance, or market rally. End-of-life net worth alone wasn't
+    // discriminating enough — many failed runs still end with sizable
+    // home equity and look fine on paper.
+    let minRetLiq = Infinity;
+    for (const h of r.history) {
+      if (h.age >= retAge && h.liquidAssets < minRetLiq) minRetLiq = h.liquidAssets;
+    }
+    return {
+      idx: i,
+      final: r.history[r.history.length - 1]?.liquidAssets ?? 0,
+      minRetLiq: minRetLiq === Infinity ? 0 : minRetLiq,
+    };
+  });
   const medianLegacy = percentile(indexed.map(x => x.final), 50);
+  indexed.sort((a, b) => a.minRetLiq - b.minRetLiq);
   const p20Run = indexed[Math.floor(indexed.length * 0.20)];
   const p20History = p20Run ? allRuns[p20Run.idx].history : [];
   return { medianLegacy, p20History };
@@ -1991,7 +2005,7 @@ async function startSimulation() {
   }
   ticking = false;
 
-  const proc = processResults(allRuns);
+  const proc = processResults(allRuns, cfg);
   const successRate = 100 * (1 - fails / cfg.simCount);
   const successEl = document.getElementById('metricSuccess');
   successEl.textContent = Math.round(successRate) + '%';
