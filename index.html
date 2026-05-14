@@ -675,6 +675,8 @@ body {
       <div class="section-body">
         <div class="field-row"><label>Annual Itemized ($)</label><input type="number" id="otherItemized" value="10000"></div>
         <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Non-SALT, non-mortgage items only (charitable, etc.). Property tax is computed automatically and capped at the $10K SALT limit. The model itemizes only when mortgage interest + SALT + this value exceeds the standard deduction.</div>
+        <div class="field-row"><label>Cap Indexing (% of CPI)</label><input type="number" id="capIndexing" value="50" step="5" min="0" max="100"></div>
+        <div style="font-size:11px;color:#7a85a0;margin:4px 0 4px;">Annual growth applied to the $750K mortgage and $10K SALT caps as a fraction of CPI. 0 = caps stay flat (statute as written); 100 = caps fully keep pace with inflation. Default 50 reflects Congress historically adjusting caps in discrete bumps that lag CPI.</div>
       </div>
     </div>
 
@@ -1087,6 +1089,7 @@ function runOnce(cfg) {
   let priceLevel = 1.0;
   let eduPriceLevel = 1.0;
   let healthPriceLevel = 1.0;
+  let capPriceLevel = 1.0;
   let spendingMult = 1.0;
 
   // LTC events happen regardless of insurance coverage. The cfg.ltcCovered
@@ -1118,6 +1121,7 @@ function runOnce(cfg) {
     eduPriceLevel *= (1 + annualInfl + eduSpread);
     const healthSpread = cfg.healthInflation - cfg.inflMean;
     healthPriceLevel *= (1 + annualInfl + healthSpread);
+    capPriceLevel *= (1 + annualInfl * cfg.capIndexing);
     const infl = priceLevel;
     const healthInfl = healthPriceLevel;
     taxEngine.adjustBrackets(annualInfl);
@@ -1316,18 +1320,15 @@ function runOnce(cfg) {
 
     // Set the year's itemized total; calcTax internally uses
     // max(stdDeduction, itemizedDed) so itemizing only kicks in when it wins.
-    // TCJA's $750K combined acquisition-debt cap was made permanent by OBBBA
-    // (2025) at a flat $750K — no inflation indexing.
+    // The $750K mortgage cap (TCJA, permanent under OBBBA) and $10K SALT cap
+    // are both indexed by capPriceLevel, which grows at cfg.capIndexing × CPI.
     const combinedAcqDebt = homeMortgage + (vacActive ? vacMortgage : 0);
-    const mortDebtCap = 750000;
+    const mortDebtCap = 750000 * capPriceLevel;
     const deductibleFrac = combinedAcqDebt > 0
       ? Math.min(1, mortDebtCap / combinedAcqDebt)
       : 1;
     const deductibleMortInt = (mortgageInterest + vacMortInterest) * deductibleFrac;
-    // SALT cap: $10K flat (TCJA, made permanent by OBBBA after the temporary
-    // 2025–2029 $40K bump expires). Property tax alone typically fills it for
-    // this household, so state income tax is implicitly absorbed by the cap.
-    const saltDeductible = Math.min(10000, propTax + vacPropTax);
+    const saltDeductible = Math.min(10000 * capPriceLevel, propTax + vacPropTax);
     taxEngine.itemizedDed = deductibleMortInt + saltDeductible + cfg.otherItemized * infl;
 
     // --- MARKET RETURNS ---
@@ -1786,6 +1787,7 @@ function readConfig() {
     bondStd:   v('bondStd') / 100,
     investmentFee: v('investmentFee'),
     otherItemized: v('otherItemized'),
+    capIndexing:   v('capIndexing') / 100,
 
     glidePath:        vb('glidePath'),
     grLower:    v('grLower'),
