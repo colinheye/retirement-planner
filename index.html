@@ -1609,25 +1609,26 @@ async function runMonteCarlo(cfg, onProgress) {
 // ---- Result processing ----
 function processResults(allRuns, cfg) {
   const retAge = cfg.retirementAge;
+  // Sort by the lowest net worth the run dips to during retirement. This
+  // matches the cyan line on the chart: a 20th-percentile run by this
+  // metric will visibly dip low at some point in retirement, regardless of
+  // whether liquid recovered later from home-sale proceeds. Previously
+  // sorted by minimum liquid in retirement, but that produced runs where
+  // liquid bottomed below the buffer yet net worth stayed high (home
+  // equity intact), making the chart look unexpectedly prosperous.
   const indexed = allRuns.map((r, i) => {
-    // Stress metric: the lowest liquid balance the run sees during
-    // retirement. Captures "how close did this run come to failing"
-    // regardless of whether it recovered later from a home sale,
-    // inheritance, or market rally. End-of-life net worth alone wasn't
-    // discriminating enough — many failed runs still end with sizable
-    // home equity and look fine on paper.
-    let minRetLiq = Infinity;
+    let minRetNw = Infinity;
     for (const h of r.history) {
-      if (h.age >= retAge && h.liquidAssets < minRetLiq) minRetLiq = h.liquidAssets;
+      if (h.age >= retAge && h.netWorth < minRetNw) minRetNw = h.netWorth;
     }
     return {
       idx: i,
       final: r.history[r.history.length - 1]?.liquidAssets ?? 0,
-      minRetLiq: minRetLiq === Infinity ? 0 : minRetLiq,
+      minRetNw: minRetNw === Infinity ? 0 : minRetNw,
     };
   });
   const medianLegacy = percentile(indexed.map(x => x.final), 50);
-  indexed.sort((a, b) => a.minRetLiq - b.minRetLiq);
+  indexed.sort((a, b) => a.minRetNw - b.minRetNw);
   const p20Run = indexed[Math.floor(indexed.length * 0.20)];
   const p20History = p20Run ? allRuns[p20Run.idx].history : [];
   return { medianLegacy, p20History };
