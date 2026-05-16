@@ -458,7 +458,7 @@ body {
   <!-- CHART (always visible, populated after each simulation run) -->
   <div id="chart-section">
     <div class="chart-header">
-      <span class="chart-title">Cash flow — 20th percentile run</span>
+      <span class="chart-title">Cash flow — 10th percentile run</span>
       <span class="chart-sub">Stacked annual expenses; dashed line is total income. Large healthcare spikes later in life are LTC events.</span>
     </div>
     <div id="chart-wrap"><svg id="expenseChart"></svg></div>
@@ -1706,9 +1706,9 @@ function processResults(allRuns, cfg) {
     if (a.failed !== b.failed) return a.failed ? -1 : 1;
     return a.minRetNw - b.minRetNw;
   });
-  const p20Run = indexed[Math.floor(indexed.length * 0.20)];
-  const p20History = p20Run ? allRuns[p20Run.idx].history : [];
-  return { medianLegacy, p20History };
+  const p10Run = indexed[Math.floor(indexed.length * 0.10)];
+  const p10History = p10Run ? allRuns[p10Run.idx].history : [];
+  return { medianLegacy, p10History };
 }
 
 // ---- Read config from UI ----
@@ -2101,14 +2101,13 @@ async function startSimulation() {
   const successRate = 100 * (1 - fails / cfg.simCount);
   const successEl = document.getElementById('metricSuccess');
   successEl.textContent = Math.round(successRate) + '%';
-  // Threshold colors mirror the About-section guidance: ≥80% comfortable,
-  // 70–80% borderline (needs flexibility), <70% leaves little room for
-  // surprises.
+  // ≥90% green, 80–90% yellow, <80% red — thresholds calibrated for a
+  // model with guardrails and backstops where remaining failures are severe.
   successEl.style.color =
-    successRate < 70 ? '#d04545' :
-    successRate < 80 ? '#e6c845' :
+    successRate < 80 ? '#d04545' :
+    successRate < 90 ? '#e6c845' :
                        '#27ae60';
-  renderExpenseChart(proc.p20History);
+  renderExpenseChart(proc.p10History);
 
   prog.style.display = 'none';
   progLabel.style.display = 'none';
