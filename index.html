@@ -297,6 +297,17 @@ body {
 }
 .field-row.checkbox-row label { cursor: pointer; color: #aab5cc; }
 
+.subsection-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #6a75a0;
+  border-bottom: 1px solid #252840;
+  padding-bottom: 3px;
+  margin: 8px 0 5px;
+}
+
 /* ---- EXPENSES MODE TOGGLE ---- */
 .exp-mode-toggle {
   display: flex;
@@ -715,11 +726,17 @@ body {
       </div>
     </div>
 
-    <!-- Guardrails -->
+    <!-- Retirement Spending -->
     <div class="section-open">
-      <div class="section-open-header">Guardrails</div>
+      <div class="section-open-header">Retirement Spending</div>
       <div class="section-body">
-        <div style="font-size:11px;color:#7a85a0;margin:2px 0 6px;">Adjusts retirement spending year-by-year based on portfolio level. Below the Lower Threshold, spending is cut by Spend Cut % each year (capped at Max Cut). Above the Upper Threshold, spending rises by Spend Raise % (capped at Max Raise). Thresholds inflate over time.</div>
+        <div class="subsection-header">Living Expense Adjustment</div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 6px;">% change applied to base living expenses in each phase of retirement, relative to pre-retirement spending.</div>
+        <div class="field-row"><label>Early (≤75) (%)</label><input type="number" id="retMultEarly" value="10" step="1"></div>
+        <div class="field-row"><label>Mid (76–85) (%)</label><input type="number" id="retMultMid" value="-5" step="1"></div>
+        <div class="field-row"><label>Late (86+) (%)</label><input type="number" id="retMultLate" value="-10" step="1"></div>
+        <div class="subsection-header">Guardrails</div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 6px;">Adjusts spending year-by-year based on portfolio level. Below the Lower Threshold, spending is cut by Spend Cut % each year (capped at Max Cut). Above the Upper Threshold, spending rises by Spend Raise % (capped at Max Raise). Thresholds inflate over time.</div>
         <div class="field-row"><label>Lower Threshold ($)</label><input type="number" id="grLower" value="600000"></div>
         <div class="field-row"><label>Upper Threshold ($)</label><input type="number" id="grUpper" value="4000000"></div>
         <div class="field-row"><label>Spend Cut (%)</label><input type="number" id="grCut" value="10" step="1"></div>
@@ -1249,7 +1266,7 @@ function runOnce(cfg) {
     // --- EXPENSES ---
     let living = cfg.baseLiving * infl * spendingMult;
     if (isRetired) {
-      const rm = age <= 75 ? 1.10 : (age <= 85 ? 0.95 : 0.90);
+      const rm = age <= 75 ? (1 + cfg.retMultEarly) : (age <= 85 ? (1 + cfg.retMultMid) : (1 + cfg.retMultLate));
       living *= rm;
     }
 
@@ -1797,6 +1814,10 @@ function readConfig() {
     capIndexing:   v('capIndexing') / 100,
 
     glidePath:        vb('glidePath'),
+    retMultEarly: v('retMultEarly') / 100,
+    retMultMid:   v('retMultMid') / 100,
+    retMultLate:  v('retMultLate') / 100,
+
     grLower:    v('grLower'),
     grUpper:    v('grUpper'),
     grCut:      v('grCut') / 100,
