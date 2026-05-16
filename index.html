@@ -659,6 +659,12 @@ body {
         <div class="field-row"><label>Inheritance Amount ($)</label><input type="number" id="inhAmount" value="250000"></div>
         <div class="field-row"><label>Expected Year</label><input type="number" id="inhYear" value="2048"></div>
         <div class="field-row"><label>Inheritance Probability (%)</label><input type="number" id="inhProb" value="80" step="1"></div>
+        <div class="subsection-header">Liquidity Event</div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 6px;">Models an IPO, acquisition, or other equity payout. Net proceeds (after your estimated effective tax rate) are added to brokerage.</div>
+        <div class="field-row"><label>Gross Proceeds ($)</label><input type="number" id="liqAmount" value="0"></div>
+        <div class="field-row"><label>Expected Year</label><input type="number" id="liqYear" value="2030"></div>
+        <div class="field-row"><label>Effective Tax Rate (%)</label><input type="number" id="liqTaxRate" value="35" step="1"></div>
+        <div class="field-row"><label>Probability (%)</label><input type="number" id="liqProb" value="50" step="1"></div>
       </div>
     </div>
 
@@ -1227,6 +1233,11 @@ function runOnce(cfg) {
       const amt = cfg.inhAmount * infl;
       brokBal   += amt;
       brokBasis += amt;
+    }
+    if (cfg.liqAmount > 0 && yr === cfg.liqYear && Math.random() < cfg.liqProb) {
+      const net = cfg.liqAmount * infl * (1 - cfg.liqTaxRate);
+      brokBal   += net;
+      brokBasis += net;
     }
 
     // --- INCOME ---
@@ -1810,6 +1821,10 @@ function readConfig() {
     inhAmount:  v('inhAmount'),
     inhYear:    vi('inhYear'),
     inhProb:    v('inhProb') / 100,
+    liqAmount:   v('liqAmount'),
+    liqYear:     vi('liqYear'),
+    liqTaxRate:  v('liqTaxRate') / 100,
+    liqProb:     v('liqProb') / 100,
 
     inflMean:  v('inflMean') / 100,
     inflStd:   v('inflStd') / 100,
