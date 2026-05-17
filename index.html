@@ -2061,8 +2061,8 @@ function renderExpenseChart(history) {
 // ---- Min liquid buffer by percentile chart ----
 let _lastBufferData = null;
 
-function renderBufferChart(minLiqValues, cfg) {
-  _lastBufferData = { minLiqValues, cfg };
+function renderBufferChart(minLiqValues, cfg, failRate) {
+  _lastBufferData = { minLiqValues, cfg, failRate };
   const svg = document.getElementById('bufferChart');
   if (!svg || !minLiqValues || minLiqValues.length < 2) return;
 
@@ -2084,8 +2084,9 @@ function renderBufferChart(minLiqValues, cfg) {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
   const n = minLiqValues.length;
-  // Clip to worst 25%
-  const nShown = Math.max(2, Math.ceil(n * 0.25));
+  // Clip to 10 percentile points beyond the failure rate
+  const bound = Math.min(1, failRate + 0.10);
+  const nShown = Math.max(2, Math.ceil(n * bound));
   const shown = minLiqValues.slice(0, nShown);
 
   const redVal   = cfg.minBuffer;
@@ -2138,11 +2139,13 @@ function renderBufferChart(minLiqValues, cfg) {
   if (yR >= padT && yR <= padT + innerH)
     out.push(`<line x1="${padL}" y1="${yR}" x2="${padL + innerW}" y2="${yR}" stroke="#d04545" stroke-width="1" stroke-dasharray="4,3" opacity="0.55"/>`);
 
-  // X-axis: 0%–25%
-  for (let p = 0; p <= 25; p += 5) {
-    const x = toX(Math.round((p / 25) * (nShown - 1)));
+  // X-axis: 0% to bound%, ticks every 5 percentage points
+  const boundPct = Math.round(bound * 100);
+  const tickStep = boundPct <= 15 ? 2 : 5;
+  for (let p = 0; p <= boundPct; p += tickStep) {
+    const x = toX(Math.round((p / boundPct) * (nShown - 1)));
     out.push(`<line x1="${x}" y1="${padT + innerH}" x2="${x}" y2="${padT + innerH + 3}" stroke="#3a4060" stroke-width="1"/>`);
-    if (!isPhone || p % 10 === 0)
+    if (!isPhone || p % (tickStep * 2) === 0)
       out.push(`<text x="${x}" y="${padT + innerH + fsAxis + 5}" text-anchor="middle" font-size="${fsAxis}" fill="#7a85a0">${p}%</text>`);
   }
 
@@ -2157,7 +2160,7 @@ window.addEventListener('resize', () => {
   clearTimeout(_chartResizeTimer);
   _chartResizeTimer = setTimeout(() => {
     if (_lastChartHistory) renderExpenseChart(_lastChartHistory);
-    if (_lastBufferData) renderBufferChart(_lastBufferData.minLiqValues, _lastBufferData.cfg);
+    if (_lastBufferData) renderBufferChart(_lastBufferData.minLiqValues, _lastBufferData.cfg, _lastBufferData.failRate);
   }, 150);
 });
 
@@ -2219,7 +2222,7 @@ async function startSimulation() {
     successRate < 90 ? '#e6c845' :
                        '#27ae60';
   renderExpenseChart(proc.p10History);
-  renderBufferChart(proc.minLiqValues, cfg);
+  renderBufferChart(proc.minLiqValues, cfg, fails / cfg.simCount);
 
   prog.style.display = 'none';
   progLabel.style.display = 'none';
