@@ -2153,6 +2153,20 @@ function renderBufferChart(minLiqValues, cfg, failRate) {
   // Gradient line
   out.push(`<polyline points="${ptStr}" fill="none" stroke="url(#bufferGrad)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`);
 
+  // Inset: 25th percentile and median stats (rendered last so it sits on top)
+  const p25val = minLiqValues[Math.floor(n * 0.25)];
+  const p50val = minLiqValues[Math.floor(n * 0.50)];
+  const fsInset = isPhone ? 12 : 10;
+  const insetW  = isPhone ? 104 : 90;
+  const insetH  = isPhone ? 40  : 32;
+  const insetX  = padL + 5;
+  const insetY  = padT + 5;
+  out.push(`<rect x="${insetX}" y="${insetY}" width="${insetW}" height="${insetH}" fill="#1a1e30" rx="3" opacity="0.88"/>`);
+  out.push(`<text x="${insetX + 5}" y="${insetY + fsInset + 2}" font-size="${fsInset}" fill="#7a85a0">25th pct</text>`);
+  out.push(`<text x="${insetX + insetW - 5}" y="${insetY + fsInset + 2}" text-anchor="end" font-size="${fsInset}" fill="#cdd3e0">${_fmtChartMoney(p25val)}</text>`);
+  out.push(`<text x="${insetX + 5}" y="${insetY + fsInset * 2 + 6}" font-size="${fsInset}" fill="#7a85a0">Median</text>`);
+  out.push(`<text x="${insetX + insetW - 5}" y="${insetY + fsInset * 2 + 6}" text-anchor="end" font-size="${fsInset}" fill="#cdd3e0">${_fmtChartMoney(p50val)}</text>`);
+
   svg.innerHTML = out.join('');
 }
 
