@@ -447,7 +447,7 @@ body {
       <p>This calculator runs <strong>thousands of randomized simulations</strong> of your financial future. Each one rolls the dice on stock returns, inflation, healthcare costs, and how long you and your spouse live — then tracks your accounts, taxes, income, and spending year by year.</p>
       <p>The <strong>Success Rate</strong> is the percentage of simulations where your liquid assets stayed above the <strong>Minimum Liquid Buffer</strong> all the way through end of life. Before a simulation is counted as failed, the model has already attempted to rescue it — spending has been cut by guardrails, and the vacation home has been sold if applicable. A failure means all of those backstops were exhausted and the portfolio still ran out. That makes each failed simulation a genuinely severe outcome.</p>
       <p><strong>What to aim for:</strong> Because failures here represent worst-case scenarios that survived every safeguard, the thresholds are tighter than rules-of-thumb from simpler models. <strong>90% or above</strong> is the comfortable target — displayed in green. <strong>80–89%</strong> warrants attention — yellow. <strong>Below 80%</strong> means a meaningful share of scenarios end in serious trouble even after guardrails and backstops have done their work — red. Above 95% often signals you're being overly conservative and could safely spend more.</p>
-      <p>The <strong>Min Liquid Buffer chart</strong> shows how low each simulation's liquid portfolio got during retirement, sorted from worst to best. The x-axis extends 10 percentile points past your failure rate so you can see both the tail that fails and the margin above it.</p>
+      <p>The <strong>Min Liquid Buffer chart</strong> shows how low each simulation's liquid portfolio got during retirement — in <strong>today's dollars</strong> (inflation-adjusted), so it's directly comparable to the Min Liquid Buffer floor — sorted from worst to best. The x-axis extends 10 percentile points past your failure rate so you can see both the tail that fails and the margin above it.</p>
       <p>Adjust the inputs below and tap <strong>Run Simulation</strong>. Your inputs save automatically in this browser.</p>
       <p><strong>All values are in today's dollars</strong> — the simulation inflates them internally each year, so you don't have to project future prices yourself.</p>
       <p style="text-align:center;margin-top:14px;">
@@ -466,8 +466,8 @@ body {
     <div id="chart-legend"></div>
     <div style="margin-top:14px;">
       <div class="chart-header">
-        <span class="chart-title">Min liquid buffer by percentile</span>
-        <span class="chart-sub">Lowest liquid portfolio value reached during retirement for each simulation, sorted worst to best. The dashed line marks the plan failure floor.</span>
+        <span class="chart-title">Min liquid buffer by percentile (today's $)</span>
+        <span class="chart-sub">Lowest liquid portfolio value reached during retirement for each simulation, in today's (inflation-adjusted) dollars, sorted worst to best. The dashed line marks the plan failure floor.</span>
       </div>
       <svg id="bufferChart" style="display:block;width:100%;"></svg>
     </div>
@@ -484,7 +484,8 @@ body {
         <div class="field-row"><label>Start Age</label><input type="number" id="startAge" value="38"></div>
         <div class="field-row"><label>Retirement Age</label><input type="number" id="retirementAge" value="65"></div>
         <div class="field-row"><label>Simulations</label><input type="number" id="simCount" value="20000"></div>
-        <div class="field-row"><label>Min Liquid Buffer ($)</label><input type="number" id="minBuffer" value="500000"></div>
+        <div class="field-row"><label>Min Liquid Buffer (today's $)</label><input type="number" id="minBuffer" value="200000"></div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 4px;">A run "fails" if liquid assets ever fall below this floor in retirement. Entered in <strong>today's dollars</strong> and inflated each year, so it stays a constant real safety margin rather than shrinking away as the nominal portfolio grows.</div>
       </div>
     </div>
 
@@ -1709,14 +1710,20 @@ function runOnce(cfg) {
       }
     }
 
-    // Failure check — sell vacation home as last resort before declaring failure
-    if (liq < cfg.minBuffer && !failed) {
+    // Failure check — sell vacation home as last resort before declaring failure.
+    // minBuffer is a constant-REAL floor (entered in today's dollars), so it is
+    // inflated to the current price level here — matching the guardrail
+    // thresholds above. Without the * infl the floor would shrink to nothing in
+    // real terms over a multi-decade horizon, making late-life failure all but
+    // impossible once the nominal portfolio compounds.
+    const bufferNominal = cfg.minBuffer * infl;
+    if (liq < bufferNominal && !failed) {
       if (vacActive) {
         const net = Math.max(0, vacHomeVal * (cfg.vacOwnership / 100) * (1 - 0.06) - vacMortgage);
         brokBal += net; brokBasis += net; liq += net;
         vacHomeVal = 0; vacMortgage = 0; vacMortgagePmt = 0; vacActive = false;
       }
-      if (liq < cfg.minBuffer) {
+      if (liq < bufferNominal) {
         failed = true;
         failYear = yr;
       }
@@ -1737,6 +1744,7 @@ function runOnce(cfg) {
       : 0;
     history.push({
       year: yr, age,
+      priceLevel: infl,
       liquidAssets: Math.max(0, liq),
       netWorth:   Math.max(0, liq) + vacEquity,
       brokerage:  Math.max(0, brokBal),
@@ -1815,10 +1823,14 @@ function processResults(allRuns, cfg) {
   const p10Run = indexed[Math.floor(indexed.length * 0.10)];
   const p10History = p10Run ? allRuns[p10Run.idx].history : [];
 
+  // Min liquid is measured in REAL (today's) dollars — deflated by that
+  // year's price level — so it is directly comparable to the minBuffer floor
+  // (also in today's dollars). This makes "min real liquid < minBuffer"
+  // exactly equivalent to the failure condition in runOnce.
   const minLiqValues = allRuns.map(r => {
     let min = Infinity;
     for (const h of r.history) {
-      if (h.age >= retAge) min = Math.min(min, h.liquidAssets);
+      if (h.age >= retAge) min = Math.min(min, h.liquidAssets / (h.priceLevel || 1));
     }
     return min === Infinity ? 0 : min;
   }).sort((a, b) => a - b);
