@@ -697,6 +697,21 @@ body {
       </div>
     </div>
 
+    <!-- Bucket Strategy -->
+    <div class="section-open">
+      <div class="section-open-header">Bucket Strategy</div>
+      <div class="section-body">
+        <div class="field-row checkbox-row">
+          <label for="useBucketStrategy">Use Bucket Strategy (vs. proportional)</label>
+          <input type="checkbox" id="useBucketStrategy">
+        </div>
+        <div style="font-size:11px;color:#7a85a0;margin:2px 0 6px;">In retirement, hold a bond bucket sized to cover N years of expenses and spend it down first. Stocks are sold to refill bonds <strong>only when they're near their rolling peak</strong> — never when they're down — so losses aren't locked in (sequence-of-returns protection). If the bond bucket runs dry, stocks are sold regardless of price (a forced sale, which the strategy tries to minimize). When on, this replaces the glide path during retirement. Toggle off to use the existing proportional withdrawal and compare success rates directly.</div>
+        <div class="field-row"><label>Bond Bucket (yrs of expenses)</label><input type="number" id="bucketYears" value="5" step="1" min="0"></div>
+        <div class="field-row"><label>Sell Stocks Above (% of peak)</label><input type="number" id="bucketPeakThreshold" value="85" step="1" min="0" max="100"></div>
+        <div class="field-row"><label>Refill Bonds Below (% of target)</label><input type="number" id="bucketRefillTrigger" value="40" step="1" min="0" max="100"></div>
+      </div>
+    </div>
+
     <!-- Tax Deductions -->
     <div class="section-open">
       <div class="section-open-header">Tax Deductions</div>
@@ -1134,6 +1149,15 @@ function runOnce(cfg) {
   let capPriceLevel = 1.0;
   let spendingMult = 1.0;
 
+  // --- Bucket strategy state (only used when cfg.useBucketStrategy) ---
+  // bondBal / stockBal are a portfolio-wide asset-allocation overlay laid
+  // on top of the per-account balances (which stay the source of truth for
+  // taxes). Their sum is kept equal to total liquid assets. stockPeak is the
+  // running high-water mark of the stock bucket; stocks are only sold to
+  // refill bonds while they're near this peak, never when they're down.
+  let bondBal = 0, stockBal = 0, stockPeak = 0, bucketInit = false;
+  let forcedSaleYears = 0;
+
   // LTC events happen regardless of insurance coverage. The cfg.ltcCovered
   // flag only governs whether premiums are paid and whether the cost is
   // reduced by cfg.ltcCoverage.
@@ -1382,10 +1406,49 @@ function runOnce(cfg) {
     taxEngine.itemizedDed = deductibleMortInt + saltDeductible + cfg.otherItemized * infl;
 
     // --- MARKET RETURNS ---
-    const sp = stockPct(age, cfg.glidePath);
-    const mkt = sp * normalSample(cfg.stockMean, cfg.stockStd)
-              + (1 - sp) * normalSample(cfg.bondMean, cfg.bondStd)
-              - cfg.investmentFee / 100;
+    // Bucket strategy: at the first retired year, carve the liquid portfolio
+    // into a bond bucket (sized to cover bucketYears of expenses) and a stock
+    // bucket. In later years true the buckets up to the current account total
+    // so windfalls / home sales / RMD shuffles that ran above stay reconciled
+    // without per-account asset tracking.
+    const bucketsOn = cfg.useBucketStrategy && isRetired;
+    if (bucketsOn) {
+      const liqNow = hsa + ira + trad401k + roth401k + brokBal;
+      if (!bucketInit) {
+        const bondTarget = cfg.bucketYears * totalExp;
+        bondBal  = Math.min(Math.max(0, liqNow), bondTarget);
+        stockBal = Math.max(0, liqNow - bondBal);
+        stockPeak = stockBal;
+        bucketInit = true;
+      } else {
+        const sum = stockBal + bondBal;
+        const scale = sum > 0 ? liqNow / sum : 0;
+        stockBal *= scale;
+        bondBal  *= scale;
+      }
+    }
+
+    let mkt;
+    if (bucketsOn && bucketInit) {
+      // Returns are applied per asset class. The accounts (still the tax
+      // ledger) all grow by the same portfolio-wide blended rate derived from
+      // the current bond/stock split, which keeps their sum equal to
+      // stockBal + bondBal. The glide path is intentionally bypassed here —
+      // the bucket allocation governs the mix during retirement.
+      const rs = normalSample(cfg.stockMean, cfg.stockStd) - cfg.investmentFee / 100;
+      const rb = normalSample(cfg.bondMean,  cfg.bondStd)  - cfg.investmentFee / 100;
+      const tot = stockBal + bondBal;
+      const f = tot > 0 ? stockBal / tot : stockPct(age, cfg.glidePath);
+      mkt = f * rs + (1 - f) * rb;
+      stockBal *= (1 + rs);
+      bondBal  *= (1 + rb);
+      stockPeak = Math.max(stockPeak, stockBal);
+    } else {
+      const sp = stockPct(age, cfg.glidePath);
+      mkt = sp * normalSample(cfg.stockMean, cfg.stockStd)
+          + (1 - sp) * normalSample(cfg.bondMean, cfg.bondStd)
+          - cfg.investmentFee / 100;
+    }
     hsa      *= (1 + mkt);
     ira      *= (1 + mkt);
     trad401k *= (1 + mkt);
@@ -1599,6 +1662,40 @@ function runOnce(cfg) {
 
     }
 
+    // --- BUCKET RECONCILIATION ---
+    // Map the year's net liquid change back onto the buckets. The tax
+    // waterfall above already decided which accounts the cash came from; here
+    // we decide which asset class it came from. Spending is drawn from bonds
+    // first, and only when the bond bucket is exhausted are stocks sold (a
+    // forced sale — the loss-locking event the strategy exists to minimize).
+    // Surplus is reinvested into stocks.
+    if (bucketsOn && bucketInit) {
+      const liqAfter = hsa + ira + trad401k + roth401k + brokBal;
+      const delta = (stockBal + bondBal) - liqAfter; // >0 net withdrawn, <0 surplus
+      if (delta > 0) {
+        const fromBonds = Math.min(bondBal, delta);
+        bondBal -= fromBonds;
+        const rem = delta - fromBonds;
+        if (rem > 0) {
+          stockBal = Math.max(0, stockBal - rem);
+          forcedSaleYears++;
+        }
+      } else if (delta < 0) {
+        stockBal += -delta;
+      }
+      // Asymmetric rebalance: refill the bond bucket toward target only when
+      // it has run low AND stocks are still near their peak (never sell stocks
+      // that are down to top up bonds — that's the whole point of the strategy).
+      const bondTarget = cfg.bucketYears * totalExp;
+      if (bondTarget > 0
+          && bondBal < cfg.bucketRefillTrigger * bondTarget
+          && stockBal > cfg.bucketPeakThreshold * stockPeak) {
+        const refill = Math.min(bondTarget - bondBal, stockBal);
+        stockBal -= refill;
+        bondBal  += refill;
+      }
+    }
+
     // POST-YEAR
     let liq = hsa + ira + trad401k + roth401k + brokBal;
 
@@ -1661,7 +1758,7 @@ function runOnce(cfg) {
     });
   }
 
-  return { failed, failYear, history };
+  return { failed, failYear, history, forcedSaleYears };
 }
 
 // ---- Monte Carlo runner ----
@@ -1859,6 +1956,11 @@ function readConfig() {
     retMultEarly: v('retMultEarly') / 100,
     retMultMid:   v('retMultMid') / 100,
     retMultLate:  v('retMultLate') / 100,
+
+    useBucketStrategy:   vb('useBucketStrategy'),
+    bucketYears:         v('bucketYears'),
+    bucketPeakThreshold: v('bucketPeakThreshold') / 100,
+    bucketRefillTrigger: v('bucketRefillTrigger') / 100,
 
     grLower:    v('grLower'),
     grUpper:    v('grUpper'),
